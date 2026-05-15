@@ -1,7 +1,7 @@
 {
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/cli", "packages/dashboard"],
   "scripts": {
     "build": "cargo build --release -p dejavu-cli && bun run build:cli",
     "build:core": "cargo build --release -p dejavu-cli",

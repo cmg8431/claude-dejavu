@@ -16,13 +16,6 @@
     "build": "tsc",
     "dev": "bun src/index.ts"
   },
-  "optionalDependencies": {
-    "@claude-dejavu/cli-darwin-arm64": "0.1.0",
-    "@claude-dejavu/cli-darwin-x64": "0.1.0",
-    "@claude-dejavu/cli-linux-x64-gnu": "0.1.0",
-    "@claude-dejavu/cli-linux-arm64-gnu": "0.1.0",
-    "@claude-dejavu/cli-win32-x64-msvc": "0.1.0"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.5.0"
