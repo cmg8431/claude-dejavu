@@ -163,3 +163,118 @@ fn is_likely_correction(
 
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{FileEdit, ParsedSession};
+
+    fn make_session(id: &str, file_edits: Vec<FileEdit>) -> ParsedSession {
+        ParsedSession {
+            id: id.to_string(),
+            project_path: "/test/project".to_string(),
+            messages: vec![],
+            tool_calls: vec![],
+            errors: vec![],
+            file_edits,
+        }
+    }
+
+    fn make_edit(
+        file: &str,
+        old: Option<&str>,
+        new: Option<&str>,
+        tool: &str,
+        index: usize,
+    ) -> FileEdit {
+        FileEdit {
+            file_path: file.to_string(),
+            old_content: old.map(String::from),
+            new_content: new.map(String::from),
+            tool_name: tool.to_string(),
+            index,
+        }
+    }
+
+    #[test]
+    fn claude_edit_followed_by_same_file_edit_detected() {
+        let edits = vec![
+            make_edit("src/lib.rs", Some("old"), Some("new"), "Edit", 1),
+            make_edit("src/lib.rs", Some("new"), Some("fixed"), "Edit", 5),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "edit followed by another edit on same file should be detected"
+        );
+        assert!(
+            detections[0]
+                .evidence
+                .file_paths
+                .contains(&"src/lib.rs".to_string())
+        );
+    }
+
+    #[test]
+    fn edits_on_different_files_no_detection() {
+        let edits = vec![
+            make_edit("src/a.rs", Some("old"), Some("new"), "Edit", 1),
+            make_edit("src/b.rs", Some("old2"), Some("new2"), "Edit", 5),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "edits on different files should not trigger silent fix detection"
+        );
+    }
+
+    #[test]
+    fn write_tool_also_detected() {
+        let edits = vec![
+            make_edit("src/lib.rs", None, Some("initial content"), "Write", 1),
+            make_edit(
+                "src/lib.rs",
+                Some("initial content"),
+                Some("corrected"),
+                "Edit",
+                5,
+            ),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "Write followed by Edit on same file should be detected"
+        );
+    }
+
+    #[test]
+    fn follow_up_without_old_content_not_detected() {
+        let edits = vec![
+            make_edit("src/lib.rs", Some("old"), Some("new"), "Edit", 1),
+            make_edit("src/lib.rs", None, None, "Edit", 5),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "follow-up edit without old_content should not be detected"
+        );
+    }
+
+    #[test]
+    fn far_apart_edits_not_detected() {
+        let edits = vec![
+            make_edit("src/lib.rs", Some("old"), Some("new"), "Edit", 1),
+            make_edit("src/lib.rs", Some("new"), Some("fixed"), "Edit", 100),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "edits far apart (index diff >= 20) should not be detected"
+        );
+    }
+}

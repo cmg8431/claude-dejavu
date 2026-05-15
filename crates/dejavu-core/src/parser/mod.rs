@@ -78,6 +78,46 @@ pub struct FileEdit {
     pub index: usize,
 }
 
+/// Check if a file path matches any excluded pattern.
+///
+/// Supported glob forms:
+/// - `**/segment/**` — matches if `segment` appears as a path component
+/// - `*.ext` — matches if the path ends with `.ext`
+/// - Exact string — matches if the path contains the pattern literally
+pub fn should_skip_file(path: &str, excluded: &[String]) -> bool {
+    for pattern in excluded {
+        if pattern.starts_with("**/") && pattern.ends_with("/**") {
+            // e.g. "**/node_modules/**" → check if the segment appears in the path
+            let segment = &pattern[3..pattern.len() - 3];
+            if path.contains(&format!("/{segment}/")) || path.contains(&format!("{segment}/")) {
+                return true;
+            }
+        } else if pattern.starts_with("*.") {
+            // e.g. "*.env" → check extension
+            let suffix = &pattern[1..]; // ".env"
+            if path.ends_with(suffix) {
+                return true;
+            }
+        } else if path.contains(pattern.as_str()) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Returns true if user message content contains a `<private>` tag.
+fn content_has_private_tag(content: &Option<serde_json::Value>) -> bool {
+    match content {
+        Some(serde_json::Value::String(s)) => s.contains("<private>"),
+        Some(serde_json::Value::Array(arr)) => arr.iter().any(|item| {
+            item.get("text")
+                .and_then(|t| t.as_str())
+                .is_some_and(|s| s.contains("<private>"))
+        }),
+        _ => false,
+    }
+}
+
 pub fn find_session_files(claude_dir: &Path) -> Result<Vec<PathBuf>> {
     let projects_dir = claude_dir.join("projects");
     if !projects_dir.exists() {
@@ -111,6 +151,10 @@ pub fn find_session_files(claude_dir: &Path) -> Result<Vec<PathBuf>> {
 }
 
 pub fn parse_session(path: &Path) -> Result<ParsedSession> {
+    parse_session_with_excludes(path, &[])
+}
+
+pub fn parse_session_with_excludes(path: &Path, excluded: &[String]) -> Result<ParsedSession> {
     let content = std::fs::read_to_string(path)?;
 
     let session_id = path
@@ -176,9 +220,10 @@ pub fn parse_session(path: &Path) -> Result<ParsedSession> {
 
                             let tc_idx = tool_calls.len();
 
-                            // Extract file edits
+                            // Extract file edits, skipping excluded paths
                             if is_file_edit(&tool_name)
                                 && let Some(edit) = extract_file_edit(&tool_name, &tool_input, idx)
+                                && !should_skip_file(&edit.file_path, excluded)
                             {
                                 file_edits.push(edit);
                             }
@@ -202,6 +247,11 @@ pub fn parse_session(path: &Path) -> Result<ParsedSession> {
             "user" => {
                 let msg = entry.message.as_ref();
                 let content_val = msg.and_then(|m| m.content.clone());
+
+                // Skip messages containing <private> tags
+                if content_has_private_tag(&content_val) {
+                    continue;
+                }
 
                 // Check if this is a tool_result response
                 if let Some(serde_json::Value::Array(arr)) = &content_val {
@@ -350,4 +400,165 @@ fn extract_error_line(text: &str) -> String {
         .find(|l| !l.trim().is_empty())
         .unwrap_or("")
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_jsonl_line(entry_type: &str, role: &str, content: serde_json::Value) -> String {
+        serde_json::json!({
+            "type": entry_type,
+            "uuid": "test-uuid-123",
+            "parentUuid": null,
+            "timestamp": "2025-01-01T00:00:00Z",
+            "sessionId": "test-session",
+            "cwd": "/test/project",
+            "message": {
+                "role": role,
+                "content": content
+            }
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn parse_assistant_with_tool_use() {
+        let content = serde_json::json!([
+            {
+                "type": "text",
+                "text": "Let me edit that file."
+            },
+            {
+                "type": "tool_use",
+                "id": "tu_123",
+                "name": "Edit",
+                "input": {
+                    "file_path": "/test/src/main.rs",
+                    "old_string": "old code",
+                    "new_string": "new code"
+                }
+            }
+        ]);
+
+        let line = make_jsonl_line("assistant", "assistant", content);
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), &line).unwrap();
+
+        let session = parse_session(tmp.path()).unwrap();
+        assert_eq!(session.tool_calls.len(), 1);
+        assert_eq!(session.tool_calls[0].name, "Edit");
+        assert_eq!(session.tool_calls[0].tool_use_id, "tu_123");
+        assert_eq!(session.file_edits.len(), 1);
+        assert_eq!(session.file_edits[0].file_path, "/test/src/main.rs");
+    }
+
+    #[test]
+    fn parse_user_with_tool_result() {
+        let assistant_line = make_jsonl_line(
+            "assistant",
+            "assistant",
+            serde_json::json!([
+                {
+                    "type": "tool_use",
+                    "id": "tu_456",
+                    "name": "Bash",
+                    "input": {"command": "cargo build"}
+                }
+            ]),
+        );
+
+        let user_line = make_jsonl_line(
+            "user",
+            "user",
+            serde_json::json!([
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "tu_456",
+                    "is_error": true,
+                    "content": "error: cannot find crate `foo`"
+                }
+            ]),
+        );
+
+        let jsonl = format!("{}\n{}", assistant_line, user_line);
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), &jsonl).unwrap();
+
+        let session = parse_session(tmp.path()).unwrap();
+        assert_eq!(session.tool_calls.len(), 1);
+        assert!(session.tool_calls[0].result.is_some());
+        let result = session.tool_calls[0].result.as_ref().unwrap();
+        assert!(result.is_error);
+        assert!(result.content.contains("cannot find crate"));
+        assert!(!session.errors.is_empty());
+    }
+
+    #[test]
+    fn extract_file_edit_from_edit_tool() {
+        let input = serde_json::json!({
+            "file_path": "/test/src/lib.rs",
+            "old_string": "fn old() {}",
+            "new_string": "fn new() {}"
+        });
+
+        let edit = extract_file_edit("Edit", &input, 0).unwrap();
+        assert_eq!(edit.file_path, "/test/src/lib.rs");
+        assert_eq!(edit.old_content.as_deref(), Some("fn old() {}"));
+        assert_eq!(edit.new_content.as_deref(), Some("fn new() {}"));
+        assert_eq!(edit.tool_name, "Edit");
+    }
+
+    #[test]
+    fn extract_file_edit_from_write_tool() {
+        let input = serde_json::json!({
+            "file_path": "/test/new_file.rs",
+            "content": "fn main() {}"
+        });
+
+        let edit = extract_file_edit("Write", &input, 0).unwrap();
+        assert_eq!(edit.file_path, "/test/new_file.rs");
+        assert!(edit.old_content.is_none());
+        assert_eq!(edit.new_content.as_deref(), Some("fn main() {}"));
+    }
+
+    #[test]
+    fn is_file_edit_recognizes_edit_tools() {
+        assert!(is_file_edit("Edit"));
+        assert!(is_file_edit("Write"));
+        assert!(is_file_edit("NotebookEdit"));
+        assert!(!is_file_edit("Bash"));
+        assert!(!is_file_edit("Read"));
+    }
+
+    #[test]
+    fn has_error_indicators_works() {
+        assert!(has_error_indicators("Error: something failed"));
+        assert!(has_error_indicators("error: bad input"));
+        assert!(has_error_indicators("test FAILED"));
+        assert!(has_error_indicators("error[E0308]: mismatched types"));
+        assert!(has_error_indicators("Exit code 1"));
+        assert!(!has_error_indicators("everything is fine"));
+    }
+
+    #[test]
+    fn extract_error_line_finds_error() {
+        let text = "Compiling foo v0.1.0\nerror: cannot find crate\nnote: see docs";
+        let line = extract_error_line(text);
+        assert_eq!(line, "error: cannot find crate");
+    }
+
+    #[test]
+    fn parse_empty_file() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), "").unwrap();
+
+        let session = parse_session(tmp.path()).unwrap();
+        assert!(session.messages.is_empty());
+        assert!(session.tool_calls.is_empty());
+        assert!(session.errors.is_empty());
+        assert!(session.file_edits.is_empty());
+    }
 }

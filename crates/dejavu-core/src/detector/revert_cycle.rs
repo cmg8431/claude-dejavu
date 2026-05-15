@@ -134,3 +134,122 @@ fn text_similarity(a: &str, b: &str) -> f64 {
 
     common as f64 / total as f64
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{FileEdit, ParsedSession};
+
+    fn make_session(id: &str, file_edits: Vec<FileEdit>) -> ParsedSession {
+        ParsedSession {
+            id: id.to_string(),
+            project_path: "/test/project".to_string(),
+            messages: vec![],
+            tool_calls: vec![],
+            errors: vec![],
+            file_edits,
+        }
+    }
+
+    fn make_edit(file: &str, old: Option<&str>, new: Option<&str>, index: usize) -> FileEdit {
+        FileEdit {
+            file_path: file.to_string(),
+            old_content: old.map(String::from),
+            new_content: new.map(String::from),
+            tool_name: "Edit".to_string(),
+            index,
+        }
+    }
+
+    #[test]
+    fn three_edits_same_file_with_revert_detected() {
+        // Edit 0: write "version A"
+        // Edit 1: change to something else (old="version A", new="version B")
+        // Edit 2: revert back (old="version A", new="version C")
+        //   -> edit 2's old_content matches edit 0's new_content = revert cycle
+        let edits = vec![
+            make_edit(
+                "src/main.rs",
+                None,
+                Some("fn main() {\n    println!(\"hello\");\n}"),
+                0,
+            ),
+            make_edit(
+                "src/main.rs",
+                Some("fn main() {\n    println!(\"hello\");\n}"),
+                Some("fn main() {\n    println!(\"world\");\n}"),
+                1,
+            ),
+            make_edit(
+                "src/main.rs",
+                Some("fn main() {\n    println!(\"hello\");\n}"),
+                Some("fn main() {\n    println!(\"fixed\");\n}"),
+                2,
+            ),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "should detect revert cycle on same file"
+        );
+        assert!(
+            detections[0]
+                .evidence
+                .file_paths
+                .contains(&"src/main.rs".to_string())
+        );
+    }
+
+    #[test]
+    fn different_files_no_detection() {
+        let edits = vec![
+            make_edit("src/a.rs", None, Some("content a"), 0),
+            make_edit("src/b.rs", None, Some("content b"), 1),
+            make_edit("src/c.rs", None, Some("content c"), 2),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "edits on different files should not trigger revert cycle"
+        );
+    }
+
+    #[test]
+    fn fewer_than_three_edits_no_detection() {
+        let edits = vec![
+            make_edit("src/main.rs", None, Some("content"), 0),
+            make_edit("src/main.rs", Some("content"), Some("changed"), 1),
+        ];
+        let sessions = vec![make_session("s1", edits)];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "fewer than 3 edits should not trigger detection"
+        );
+    }
+
+    #[test]
+    fn text_similarity_identical() {
+        assert_eq!(text_similarity("hello", "hello"), 1.0);
+    }
+
+    #[test]
+    fn text_similarity_empty() {
+        assert_eq!(text_similarity("", "hello"), 0.0);
+        assert_eq!(text_similarity("hello", ""), 0.0);
+    }
+
+    #[test]
+    fn text_similarity_partial() {
+        let a = "line1\nline2\nline3";
+        let b = "line1\nline2\nline4";
+        let sim = text_similarity(a, b);
+        assert!(
+            sim > 0.5 && sim < 1.0,
+            "partial overlap should be between 0.5 and 1.0, got {}",
+            sim
+        );
+    }
+}

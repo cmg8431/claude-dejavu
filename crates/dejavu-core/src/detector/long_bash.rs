@@ -138,3 +138,99 @@ fn normalize_error_key(msg: &str) -> String {
 fn truncate(s: &str, max: usize) -> &str {
     if s.len() <= max { s } else { &s[..max] }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{ParsedSession, ToolCall, ToolResult};
+
+    fn make_session_with_bash_calls(id: &str, bash_count: usize) -> ParsedSession {
+        let tool_calls = (0..bash_count)
+            .map(|i| ToolCall {
+                name: "Bash".to_string(),
+                input: serde_json::json!({"command": "echo test"}),
+                result: Some(ToolResult {
+                    content: "test".to_string(),
+                    is_error: false,
+                }),
+                index: i,
+                tool_use_id: format!("tool_{}", i),
+            })
+            .collect();
+
+        ParsedSession {
+            id: id.to_string(),
+            project_path: "/test/project".to_string(),
+            messages: vec![],
+            tool_calls,
+            errors: vec![],
+            file_edits: vec![],
+        }
+    }
+
+    #[test]
+    fn session_with_3x_average_bash_calls_detected() {
+        // 4 sessions: 3 normal (10 calls each), 1 outlier (80 calls)
+        // avg = (10+10+10+80)/4 = 27.5, threshold = 27.5 * 2.5 = 68.75
+        // The 80-call session exceeds the threshold
+        let sessions = vec![
+            make_session_with_bash_calls("s1", 10),
+            make_session_with_bash_calls("s2", 10),
+            make_session_with_bash_calls("s3", 10),
+            make_session_with_bash_calls("s_outlier", 80),
+        ];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "session with 3x average bash calls should be detected"
+        );
+        assert!(
+            detections
+                .iter()
+                .any(|d| d.evidence.sessions.contains(&"s_outlier".to_string()))
+        );
+    }
+
+    #[test]
+    fn normal_sessions_no_detection() {
+        let sessions = vec![
+            make_session_with_bash_calls("s1", 10),
+            make_session_with_bash_calls("s2", 12),
+            make_session_with_bash_calls("s3", 8),
+            make_session_with_bash_calls("s4", 11),
+        ];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "normal sessions should not trigger detection"
+        );
+    }
+
+    #[test]
+    fn fewer_than_3_sessions_no_detection() {
+        let sessions = vec![
+            make_session_with_bash_calls("s1", 100),
+            make_session_with_bash_calls("s2", 5),
+        ];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "fewer than 3 sessions should not trigger detection"
+        );
+    }
+
+    #[test]
+    fn very_low_average_no_detection() {
+        // avg < 3.0 should return early
+        let sessions = vec![
+            make_session_with_bash_calls("s1", 1),
+            make_session_with_bash_calls("s2", 2),
+            make_session_with_bash_calls("s3", 1),
+        ];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "very low bash average should not trigger detection"
+        );
+    }
+}

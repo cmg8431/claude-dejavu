@@ -101,3 +101,115 @@ fn calculate_confidence(total_occurrences: usize, unique_sessions: usize) -> f64
 fn truncate(s: &str, max: usize) -> &str {
     if s.len() <= max { s } else { &s[..max] }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{ErrorEvent, ParsedSession};
+
+    fn make_session(id: &str, errors: Vec<ErrorEvent>) -> ParsedSession {
+        ParsedSession {
+            id: id.to_string(),
+            project_path: "/test/project".to_string(),
+            messages: vec![],
+            tool_calls: vec![],
+            errors,
+            file_edits: vec![],
+        }
+    }
+
+    fn make_error(msg: &str) -> ErrorEvent {
+        ErrorEvent {
+            message: msg.to_string(),
+            tool_name: "Bash".to_string(),
+            index: 0,
+        }
+    }
+
+    #[test]
+    fn two_sessions_same_error_detected() {
+        let sessions = vec![
+            make_session("s1", vec![make_error("error: cannot find module 'foo'")]),
+            make_session("s2", vec![make_error("error: cannot find module 'foo'")]),
+        ];
+        let detections = detect(&sessions);
+        assert!(!detections.is_empty(), "should detect repeated error");
+        assert!(detections[0].confidence > 0.0);
+        assert_eq!(detections[0].evidence.occurrences, 2);
+    }
+
+    #[test]
+    fn single_session_error_not_detected() {
+        let sessions = vec![make_session(
+            "s1",
+            vec![make_error("error: something went wrong")],
+        )];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "single session error should not trigger detection"
+        );
+    }
+
+    #[test]
+    fn same_session_duplicate_errors_not_detected() {
+        // Two errors in the SAME session should not trigger (needs 2+ unique sessions)
+        let sessions = vec![make_session(
+            "s1",
+            vec![
+                make_error("error: not found"),
+                make_error("error: not found"),
+            ],
+        )];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "duplicate errors in same session should not trigger detection"
+        );
+    }
+
+    #[test]
+    fn error_normalization_strips_paths_and_line_numbers() {
+        let normalized = normalize_error("error at /home/user/project/src/main.rs:42:10");
+        assert!(
+            !normalized.contains("/home/user"),
+            "paths should be stripped"
+        );
+        assert!(normalized.contains("<path>"), "paths replaced with <PATH>");
+        assert!(
+            !normalized.contains(":42:10"),
+            "line numbers should be stripped"
+        );
+    }
+
+    #[test]
+    fn error_normalization_strips_hex_addresses() {
+        let normalized = normalize_error("segfault at 0xDEADBEEF");
+        assert!(
+            !normalized.contains("0xDEADBEEF"),
+            "hex addresses should be stripped"
+        );
+        assert!(normalized.contains("<hex>"));
+    }
+
+    #[test]
+    fn errors_with_different_paths_cluster_together() {
+        let sessions = vec![
+            make_session(
+                "s1",
+                vec![make_error(
+                    "error: file not found /home/alice/project/foo.rs",
+                )],
+            ),
+            make_session(
+                "s2",
+                vec![make_error("error: file not found /home/bob/project/foo.rs")],
+            ),
+        ];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "errors differing only in path should cluster"
+        );
+    }
+}

@@ -304,3 +304,128 @@ fn capitalize(s: &str) -> String {
         Some(c) => c.to_uppercase().to_string() + chars.as_str(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{ParsedSession, SessionMessage};
+
+    fn make_session_with_user_message(id: &str, text: &str) -> ParsedSession {
+        ParsedSession {
+            id: id.to_string(),
+            project_path: "/test/project".to_string(),
+            messages: vec![SessionMessage {
+                entry_type: "user".to_string(),
+                role: Some("user".to_string()),
+                content: Some(serde_json::Value::String(text.to_string())),
+                timestamp: None,
+                uuid: None,
+            }],
+            tool_calls: vec![],
+            errors: vec![],
+            file_edits: vec![],
+        }
+    }
+
+    #[test]
+    fn redirect_no_use_x_not_y() {
+        let sessions = vec![make_session_with_user_message("s1", "no, use pnpm not npm")];
+        let detections = detect(&sessions);
+        assert!(!detections.is_empty(), "should detect redirect correction");
+        let d = &detections[0];
+        let details = &d.evidence.details;
+        let ct = details.get("correction_type").unwrap().as_str().unwrap();
+        assert_eq!(ct, "Redirect");
+    }
+
+    #[test]
+    fn explicit_remember_rule() {
+        let sessions = vec![make_session_with_user_message(
+            "s1",
+            "remember: always use pnpm",
+        )];
+        let detections = detect(&sessions);
+        assert!(!detections.is_empty(), "should detect explicit correction");
+        let ct = detections[0]
+            .evidence
+            .details
+            .get("correction_type")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(ct, "Explicit");
+    }
+
+    #[test]
+    fn korean_redirect_detection() {
+        let sessions = vec![make_session_with_user_message("s1", "npm 말고 pnpm 써")];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "should detect Korean redirect correction"
+        );
+    }
+
+    #[test]
+    fn normal_conversation_no_detection() {
+        let sessions = vec![make_session_with_user_message(
+            "s1",
+            "Can you help me write a function to sort a list?",
+        )];
+        let detections = detect(&sessions);
+        assert!(
+            detections.is_empty(),
+            "normal conversation should not trigger correction detection"
+        );
+    }
+
+    #[test]
+    fn preference_actually() {
+        let sessions = vec![make_session_with_user_message(
+            "s1",
+            "actually, I want tabs not spaces",
+        )];
+        let detections = detect(&sessions);
+        assert!(
+            !detections.is_empty(),
+            "should detect preference correction"
+        );
+        let ct = detections[0]
+            .evidence
+            .details
+            .get("correction_type")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(ct, "Preference");
+    }
+
+    #[test]
+    fn negative_dont_use() {
+        let sessions = vec![make_session_with_user_message(
+            "s1",
+            "don't use var, use let",
+        )];
+        let detections = detect(&sessions);
+        assert!(!detections.is_empty(), "should detect negative correction");
+    }
+
+    #[test]
+    fn cross_session_boost_confidence() {
+        let sessions = vec![
+            make_session_with_user_message("s1", "no, use pnpm not npm"),
+            make_session_with_user_message("s2", "no, use pnpm not npm"),
+        ];
+        let detections = detect(&sessions);
+        assert!(!detections.is_empty());
+        // Cross-session should boost confidence
+        let single = {
+            let s = vec![make_session_with_user_message("s1", "no, use pnpm not npm")];
+            detect(&s)
+        };
+        assert!(
+            detections[0].confidence >= single[0].confidence,
+            "cross-session should have equal or higher confidence"
+        );
+    }
+}
