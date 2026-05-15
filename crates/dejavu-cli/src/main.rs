@@ -15,8 +15,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize dejavu for the current project
+    /// Initialize dejavu for the current project (alias for install)
     Init,
+    /// Install dejavu: create DB and register Claude Code hooks
+    Install,
+    /// Uninstall dejavu hooks from Claude Code settings
+    Uninstall,
     /// Scan session logs and detect antipatterns
     Scan {
         /// Project path (defaults to current directory)
@@ -102,6 +106,8 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Init => commands::init::run(),
+        Commands::Install => commands::install::run(),
+        Commands::Uninstall => commands::uninstall::run(),
         Commands::Scan { path, auto } => commands::scan::run(path, auto),
         Commands::List { path } => commands::list::run(path),
         Commands::Stats { path } => commands::stats::run(path),
