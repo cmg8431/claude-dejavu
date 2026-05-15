@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g. 0.1.0)"
+        description: "Version to publish (e.g. 0.2.0)"
         required: true
 
 jobs:
@@ -74,6 +74,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -82,14 +85,22 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION="${{ github.ref_name }}"
+            echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Update versions
         run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
-          VERSION="${VERSION#v}"
+          VERSION="${{ steps.version.outputs.version }}"
           for pkg in packages/cli-*/package.json packages/cli/package.json; do
             jq --arg v "$VERSION" '.version = $v' "$pkg" > tmp.json && mv tmp.json "$pkg"
           done
-          # Update optionalDependencies in cli
           for dep in cli-darwin-arm64 cli-darwin-x64 cli-linux-x64-gnu cli-linux-arm64-gnu cli-win32-x64-msvc; do
             jq --arg v "$VERSION" --arg d "@claude-dejavu/$dep" '.optionalDependencies[$d] = $v' packages/cli/package.json > tmp.json && mv tmp.json packages/cli/package.json
           done
@@ -100,36 +111,33 @@ jobs:
 
       - name: Place binaries and publish platform packages
         env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for pkg in cli-darwin-arm64 cli-darwin-x64 cli-linux-x64-gnu cli-linux-arm64-gnu cli-win32-x64-msvc; do
             mkdir -p "packages/$pkg/bin"
             cp artifacts/$pkg/* "packages/$pkg/bin/"
             chmod +x "packages/$pkg/bin/"* 2>/dev/null || true
             cd "packages/$pkg"
-            bun publish --access public || true
+            npm publish --access public || true
             cd ../..
             echo "Published @claude-dejavu/$pkg"
           done
 
       - name: Build and publish claude-dejavu
         env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd packages/cli
-          bun install
-          bun run build
-          bun publish --access public
+          npm install --ignore-optional
+          npx tsc
+          npm publish --access public
           echo "Published claude-dejavu"
 
       - name: Commit version bump
         run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
-          VERSION="${VERSION#v}"
+          VERSION="${{ steps.version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add packages/*/package.json
-          git commit -m "chore: bump version to $VERSION" || true
-          git push
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
+          git diff --staged --quiet || git commit -m "chore: bump version to $VERSION"
+          git push origin main || true
