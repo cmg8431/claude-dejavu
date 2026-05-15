@@ -4,6 +4,7 @@ pub mod project_context;
 pub mod repeated_error;
 pub mod revert_cycle;
 pub mod silent_fix;
+pub mod smart_analyzer;
 pub mod user_correction;
 
 use crate::parser::ParsedSession;

@@ -47,11 +47,37 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
         let confidence = (file_corrections.len() as f64 * 0.25 + 0.3).min(1.0);
 
         let short_path = shorten_path(file_path);
-        let suggested_rule = format!(
-            "`{}` was silently corrected {} times after Claude edited it. Read the file carefully before modifying — match the existing code style and patterns.",
-            short_path,
-            file_corrections.len(),
-        );
+
+        // Try AI analysis of diffs for specific rules
+        let diffs: Vec<(String, String)> = file_corrections
+            .iter()
+            .filter_map(|c| {
+                let old = c.old_text.as_ref()?;
+                let new = c.new_text.as_ref()?;
+                if old == new {
+                    return None;
+                }
+                Some((old.clone(), new.clone()))
+            })
+            .collect();
+
+        let suggested_rule = if diffs.len() >= 3 {
+            // Enough diffs — try AI analysis
+            match super::smart_analyzer::analyze_diffs(file_path, &diffs) {
+                Ok(Some(ai_rule)) => ai_rule,
+                _ => format!(
+                    "`{}` was silently corrected {} times after Claude edited it. Read the file carefully before modifying — match the existing code style and patterns.",
+                    short_path,
+                    file_corrections.len(),
+                ),
+            }
+        } else {
+            format!(
+                "`{}` was silently corrected {} times after Claude edited it. Read the file carefully before modifying — match the existing code style and patterns.",
+                short_path,
+                file_corrections.len(),
+            )
+        };
 
         detections.push(Detection {
             detector_type: DetectorType::SilentFix,
@@ -81,6 +107,8 @@ struct SilentCorrection {
     file_path: String,
     claude_edit_index: usize,
     user_edit_index: usize,
+    old_text: Option<String>,
+    new_text: Option<String>,
 }
 
 fn find_claude_edits(session: &ParsedSession) -> Vec<(String, usize)> {
@@ -126,6 +154,8 @@ fn find_user_follow_up_edits(
                     file_path: file_path.clone(),
                     claude_edit_index: *claude_idx,
                     user_edit_index: later_edit.index,
+                    old_text: later_edit.old_content.clone(),
+                    new_text: later_edit.new_content.clone(),
                 });
                 break; // One correction per Claude edit
             }
