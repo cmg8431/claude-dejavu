@@ -71,6 +71,18 @@ enum Commands {
         #[arg(short, long)]
         path: Option<String>,
     },
+    /// Start web dashboard (localhost:7777)
+    Ui {
+        /// Port (default: 7777)
+        #[arg(short = 'P', long, default_value = "7777")]
+        port: u16,
+        /// Run in background
+        #[arg(long)]
+        background: bool,
+        /// Stop background dashboard
+        #[arg(long)]
+        stop: bool,
+    },
     /// Find and remove dead rules (no fires in N days)
     Cleanup {
         /// Project path
@@ -97,6 +109,17 @@ fn main() -> anyhow::Result<()> {
         Commands::Check { path, quiet } => commands::check::run(path, quiet),
         Commands::Ingest { buffer_dir, path } => commands::ingest::run(buffer_dir, path),
         Commands::Watch { path } => commands::watch::run(path),
+        Commands::Ui {
+            port,
+            background,
+            stop,
+        } => {
+            if stop {
+                commands::ui::stop()
+            } else {
+                commands::ui::run(port, background)
+            }
+        }
         Commands::Cleanup { path, days, apply } => {
             if apply {
                 commands::cleanup::run_apply(path, days)

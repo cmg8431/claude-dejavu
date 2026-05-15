@@ -6,4 +6,5 @@ pub mod inject;
 pub mod list;
 pub mod scan;
 pub mod stats;
+pub mod ui;
 pub mod watch;

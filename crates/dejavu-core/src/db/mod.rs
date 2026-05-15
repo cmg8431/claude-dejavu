@@ -11,12 +11,16 @@ pub fn open(path: &Path) -> Result<Connection> {
     Ok(conn)
 }
 
-pub fn default_db_path() -> Result<std::path::PathBuf> {
+pub fn default_data_dir() -> Result<std::path::PathBuf> {
     let data_dir = dirs::data_dir()
         .ok_or_else(|| anyhow::anyhow!("could not find data directory"))?
         .join("claude-dejavu");
     std::fs::create_dir_all(&data_dir)?;
-    Ok(data_dir.join("dejavu.db"))
+    Ok(data_dir)
+}
+
+pub fn default_db_path() -> Result<std::path::PathBuf> {
+    Ok(default_data_dir()?.join("dejavu.db"))
 }
 
 pub fn insert_pattern(
