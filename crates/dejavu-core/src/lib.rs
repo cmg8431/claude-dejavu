@@ -164,9 +164,15 @@ impl DejavuEngine {
         let existing_rules = db::get_active_rules(&conn, &project_path.to_string_lossy())?;
         let next_id = existing_rules.len() + 1;
 
+        let max_new = self
+            .config
+            .max_rules_per_project
+            .saturating_sub(existing_rules.len());
+
         let rules: Vec<(String, Detection)> = detections
             .iter()
             .filter(|d| d.confidence >= self.config.confidence_threshold)
+            .take(max_new)
             .enumerate()
             .map(|(i, d)| {
                 let id = format!("r-{:03}", next_id + i);
@@ -233,17 +239,18 @@ fn encode_project_path(path: &Path) -> String {
 }
 
 fn is_same_project(session_project: &str, encoded: &str, target: &Path) -> bool {
-    let target_str = target.to_string_lossy();
+    // Strip leading dashes for comparison — Claude Code dirs start with "-"
+    let session_stripped = session_project.trim_start_matches('-');
+    let encoded_stripped = encoded.trim_start_matches('-');
 
-    // Direct match on encoded directory name
-    if session_project == encoded {
+    // Direct match (with or without leading dash)
+    if session_stripped == encoded_stripped {
         return true;
     }
 
-    // Partial match
-    let normalized_session = session_project.replace('\\', "/");
-    let normalized_target = target_str.replace('\\', "/");
+    // Path-based match: session dir decoded vs target path
+    let session_as_path = session_stripped.replace('-', "/");
+    let target_str = target.to_string_lossy().replace('\\', "/");
 
-    normalized_session.contains(&*normalized_target)
-        || normalized_target.contains(&normalized_session)
+    session_as_path.contains(&*target_str) || target_str.contains(&session_as_path)
 }

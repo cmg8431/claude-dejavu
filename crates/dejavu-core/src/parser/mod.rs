@@ -286,11 +286,13 @@ pub fn parse_session_with_excludes(path: &Path, excluded: &[String]) -> Result<P
                                 };
                                 tool_calls[tc_idx].result = Some(result);
 
-                                // Extract errors
-                                if is_error || has_error_indicators(&result_content) {
+                                // Extract errors (skip noise)
+                                if (is_error || has_error_indicators(&result_content))
+                                    && !is_noise_error(&result_content)
+                                {
                                     let tool_name = tool_calls[tc_idx].name.clone();
                                     let error_msg = extract_error_line(&result_content);
-                                    if !error_msg.is_empty() {
+                                    if !error_msg.is_empty() && !is_noise_error(&error_msg) {
                                         errors.push(ErrorEvent {
                                             message: error_msg,
                                             tool_name,
@@ -374,6 +376,35 @@ fn extract_file_edit(tool_name: &str, input: &serde_json::Value, index: usize) -
         tool_name: tool_name.to_string(),
         index,
     })
+}
+
+/// Filter out noise errors that aren't actionable patterns
+fn is_noise_error(text: &str) -> bool {
+    let lower = text.to_lowercase();
+
+    // Tool use rejections (user cancelled)
+    if lower.contains("tool_use_error") || lower.contains("cancelled: parallel tool call") {
+        return true;
+    }
+    // User rejected tool use
+    if lower.contains("the user doesn't want to proceed") || lower.contains("tool use was rejected")
+    {
+        return true;
+    }
+    // Code snippets misidentified as errors (line numbers at start)
+    if text.starts_with(|c: char| c.is_ascii_digit()) && text.contains('\t') {
+        return true;
+    }
+    // Diff output
+    if text.starts_with("diff --git") || text.starts_with("---") || text.starts_with("+++") {
+        return true;
+    }
+    // Import statements
+    if text.starts_with("import ") || text.starts_with("from ") {
+        return true;
+    }
+
+    false
 }
 
 fn has_error_indicators(text: &str) -> bool {

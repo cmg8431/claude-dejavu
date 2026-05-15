@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS patterns (
     session_id  TEXT NOT NULL,
     detected_at TEXT NOT NULL DEFAULT (datetime('now')),
     evidence_json TEXT NOT NULL,  -- JSON blob with detector-specific data
-    cluster_id  TEXT,             -- groups related patterns
-    FOREIGN KEY (session_id) REFERENCES sessions(id)
+    cluster_id  TEXT              -- groups related patterns
 );
 
 CREATE TABLE IF NOT EXISTS rules (
@@ -39,9 +38,7 @@ CREATE TABLE IF NOT EXISTS rule_fires (
     rule_id     TEXT NOT NULL,
     session_id  TEXT NOT NULL,
     fired_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    prevented   INTEGER DEFAULT 0,  -- 1 if the mistake was prevented
-    FOREIGN KEY (rule_id) REFERENCES rules(id),
-    FOREIGN KEY (session_id) REFERENCES sessions(id)
+    prevented   INTEGER DEFAULT 0   -- 1 if the mistake was prevented
 );
 
 -- Correction queue: real-time user corrections captured via UserPromptSubmit hook

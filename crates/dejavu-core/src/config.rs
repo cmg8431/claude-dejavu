@@ -26,6 +26,9 @@ pub struct DejavuConfig {
 
     /// Paths to exclude from scanning.
     pub excluded_paths: Vec<String>,
+
+    /// Maximum number of rules per project.
+    pub max_rules_per_project: usize,
 }
 
 impl Default for DejavuConfig {
@@ -34,10 +37,11 @@ impl Default for DejavuConfig {
             revert_cycle_min_edits: 3,
             repeated_error_min_sessions: 2,
             long_bash_threshold_multiplier: 2.5,
-            confidence_threshold: 0.5,
+            confidence_threshold: 0.6,
             dead_rule_days: 14,
             dashboard_port: 7777,
             excluded_paths: Vec::new(),
+            max_rules_per_project: 15,
         }
     }
 }
