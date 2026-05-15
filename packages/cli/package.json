@@ -1,6 +1,6 @@
 {
   "name": "claude-dejavu",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Claude remembers its mistakes. Detects antipatterns from session logs and auto-patches CLAUDE.md.",
   "license": "MIT",
   "type": "module",
@@ -10,10 +10,13 @@
   },
   "files": [
     "bin.js",
-    "dist/**/*"
+    "bin/",
+    "dist/**/*",
+    "scripts/postinstall.js"
   ],
   "scripts": {
     "build": "tsc",
+    "postinstall": "node scripts/postinstall.js",
     "dev": "bun src/index.ts"
   },
   "devDependencies": {

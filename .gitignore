@@ -4,6 +4,7 @@ dist/
 *.db
 *.db-wal
 *.db-shm
+packages/cli/bin/
 .DS_Store
 .next/
 docs/
