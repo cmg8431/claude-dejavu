@@ -33,11 +33,23 @@ pub fn format_rule(rule_id: &str, detection: &Detection) -> String {
     )
 }
 
+pub fn format_rules_plain(rules: &[(String, Detection)]) -> String {
+    let mut out = String::new();
+    for (_id, detection) in rules {
+        out.push_str(&format!("- {}\n", detection.suggested_rule));
+    }
+    out
+}
+
 pub fn patch_claude_md(project_path: &Path, rules: &[(String, Detection)]) -> Result<String> {
     let claude_md_path = project_path.join("CLAUDE.md");
+    patch_target(&claude_md_path, rules)
+}
 
-    let existing_content = if claude_md_path.exists() {
-        std::fs::read_to_string(&claude_md_path)?
+/// Patch any target file with dejavu rules section.
+pub fn patch_target(target_path: &Path, rules: &[(String, Detection)]) -> Result<String> {
+    let existing_content = if target_path.exists() {
+        std::fs::read_to_string(target_path)?
     } else {
         String::new()
     };
@@ -66,11 +78,55 @@ pub fn write_claude_md(project_path: &Path, content: &str) -> Result<()> {
     Ok(())
 }
 
+/// Write rules to the appropriate target based on scope.
+pub fn write_to_target(
+    project_path: &Path,
+    rules: &[(String, Detection)],
+    scope: &targets::RuleScope,
+) -> Result<()> {
+    let all_targets = targets::discover_targets(project_path);
+
+    let target = targets::best_target_for_scope(&all_targets, scope.clone());
+
+    let Some(target) = target else {
+        // Fallback to CLAUDE.md
+        let content = patch_claude_md(project_path, rules)?;
+        write_claude_md(project_path, &content)?;
+        return Ok(());
+    };
+
+    // Ensure parent directory exists
+    if let Some(parent) = target.path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let content = patch_target(&target.path, rules)?;
+    std::fs::write(&target.path, content)?;
+
+    Ok(())
+}
+
+/// Write global rules to ~/.claude/CLAUDE.md
+pub fn write_global_rules(rules: &[(String, Detection)]) -> Result<()> {
+    let global_path = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("no home dir"))?
+        .join(".claude")
+        .join("CLAUDE.md");
+
+    if let Some(parent) = global_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let content = patch_target(&global_path, rules)?;
+    std::fs::write(&global_path, content)?;
+
+    Ok(())
+}
+
 fn split_dejavu_section(content: &str) -> (&str, &str, &str) {
     if let Some(start_pos) = content.find(DEJAVU_SECTION_START) {
         if let Some(end_pos) = content.find(DEJAVU_SECTION_END) {
             let end_pos = end_pos + DEJAVU_SECTION_END.len();
-            // Skip trailing newline if present
             let end_pos = if content[end_pos..].starts_with('\n') {
                 end_pos + 1
             } else {
