@@ -1,0 +1,20 @@
+{
+  "name": "claude-dejavu",
+  "version": "0.1.0",
+  "description": "Claude remembers its mistakes. Detects antipatterns and auto-patches CLAUDE.md.",
+  "author": {
+    "name": "cmg8431"
+  },
+  "repository": "https://github.com/cmg8431/claude-dejavu",
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "plugin",
+    "antipattern",
+    "learning",
+    "CLAUDE.md",
+    "memory"
+  ],
+  "homepage": "https://github.com/cmg8431/claude-dejavu#readme"
+}
