@@ -61,6 +61,24 @@ enum Commands {
         #[arg(short, long)]
         path: Option<String>,
     },
+    /// Watch session logs in real-time (daemon mode)
+    Watch {
+        /// Project path
+        #[arg(short, long)]
+        path: Option<String>,
+    },
+    /// Find and remove dead rules (no fires in N days)
+    Cleanup {
+        /// Project path
+        #[arg(short, long)]
+        path: Option<String>,
+        /// Days without fire to consider dead (default: 14)
+        #[arg(long, default_value = "14")]
+        days: i64,
+        /// Actually remove dead rules
+        #[arg(long)]
+        apply: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -74,5 +92,13 @@ fn main() -> anyhow::Result<()> {
         Commands::Inject { path, format } => commands::inject::run(path, format),
         Commands::Check { path, quiet } => commands::check::run(path, quiet),
         Commands::Ingest { buffer_dir, path } => commands::ingest::run(buffer_dir, path),
+        Commands::Watch { path } => commands::watch::run(path),
+        Commands::Cleanup { path, days, apply } => {
+            if apply {
+                commands::cleanup::run_apply(path, days)
+            } else {
+                commands::cleanup::run(path, days)
+            }
+        }
     }
 }
