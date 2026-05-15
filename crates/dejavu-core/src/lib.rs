@@ -77,6 +77,84 @@ impl DejavuEngine {
         Ok(detections)
     }
 
+    /// Scan ALL projects' sessions — for bootstrapping initial rules.
+    pub fn scan_all(&self) -> Result<Vec<(String, Vec<Detection>)>> {
+        let claude_dir = dirs::home_dir()
+            .ok_or_else(|| anyhow::anyhow!("no home dir"))?
+            .join(".claude");
+
+        let projects_dir = claude_dir.join("projects");
+        if !projects_dir.exists() {
+            return Ok(vec![]);
+        }
+
+        let mut results = Vec::new();
+
+        // Group session files by project directory
+        let mut project_sessions: std::collections::HashMap<String, Vec<ParsedSession>> =
+            std::collections::HashMap::new();
+
+        let session_files = parser::find_session_files(&claude_dir)?;
+        for file in &session_files {
+            // Skip subagent sessions
+            if file.to_string_lossy().contains("subagents") {
+                continue;
+            }
+            match parser::parse_session(file) {
+                Ok(session) => {
+                    let project = session.project_path.clone();
+                    project_sessions.entry(project).or_default().push(session);
+                }
+                Err(_) => continue,
+            }
+        }
+
+        let conn = db::open(&self.db_path)?;
+
+        for (project, sessions) in &project_sessions {
+            if sessions.len() < 2 {
+                continue;
+            }
+
+            let detections = detector::run_all_detectors(sessions);
+            if detections.is_empty() {
+                continue;
+            }
+
+            // Decode project path for display
+            let display_project = project.replace('-', "/");
+            let display_project = if display_project.starts_with('/') {
+                display_project
+            } else {
+                format!("/{}", display_project)
+            };
+
+            // Store patterns
+            for detection in &detections {
+                let evidence_json = serde_json::to_string(&detection.evidence)?;
+                let session_id = detection
+                    .evidence
+                    .sessions
+                    .first()
+                    .map(|s| s.as_str())
+                    .unwrap_or("unknown");
+
+                db::insert_pattern(
+                    &conn,
+                    detection.detector_type.as_str(),
+                    &display_project,
+                    session_id,
+                    &evidence_json,
+                    None,
+                )?;
+            }
+
+            results.push((display_project, detections));
+        }
+
+        Ok(results)
+    }
+
     pub fn generate_rules(
         &self,
         project_path: &Path,
