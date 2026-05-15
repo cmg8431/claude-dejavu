@@ -182,6 +182,58 @@ pub fn get_global_rules(conn: &Connection) -> Result<Vec<Rule>> {
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
+pub fn record_rule_fire(
+    conn: &Connection,
+    rule_id: &str,
+    session_id: &str,
+    prevented: bool,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO rule_fires (rule_id, session_id, prevented) VALUES (?1, ?2, ?3)",
+        rusqlite::params![rule_id, session_id, if prevented { 1 } else { 0 }],
+    )?;
+    conn.execute(
+        "UPDATE rules SET fire_count = fire_count + 1, last_fired = datetime('now') WHERE id = ?1",
+        [rule_id],
+    )?;
+    Ok(())
+}
+
+pub fn get_dead_rules(conn: &Connection, project_path: &str, days: i64) -> Result<Vec<Rule>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, project_path, scope, scope_target, text, confidence, created_at, last_fired, fire_count, status
+         FROM rules
+         WHERE project_path = ?1
+           AND status = 'active'
+           AND fire_count = 0
+           AND julianday('now') - julianday(created_at) > ?2
+         ORDER BY created_at ASC",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![project_path, days], |row| {
+        Ok(Rule {
+            id: row.get(0)?,
+            project_path: row.get(1)?,
+            scope: row.get(2)?,
+            scope_target: row.get(3)?,
+            text: row.get(4)?,
+            confidence: row.get(5)?,
+            created_at: row.get(6)?,
+            last_fired: row.get(7)?,
+            fire_count: row.get(8)?,
+            status: row.get(9)?,
+        })
+    })?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn update_rule_status(conn: &Connection, rule_id: &str, status: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE rules SET status = ?1 WHERE id = ?2",
+        rusqlite::params![status, rule_id],
+    )?;
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub id: String,
