@@ -22,12 +22,6 @@ pub fn run(path: Option<String>, format: String) -> Result<()> {
                     "confidence": r.confidence,
                     "fire_count": r.fire_count,
                     "status": r.status,
-                    "evidence": format!(
-                        "Confidence: {:.0}%, fired {} times. Created {}.",
-                        r.confidence * 100.0,
-                        r.fire_count,
-                        r.created_at,
-                    ),
                 })
             })
             .collect();
@@ -39,36 +33,62 @@ pub fn run(path: Option<String>, format: String) -> Result<()> {
 
         println!("{}", serde_json::to_string(&output)?);
     } else {
-        if rules.is_empty() {
-            return Ok(());
-        }
-
-        // Compute effectiveness: percentage of active rules that have fired at least once
+        // claude-mem style status message for SessionStart injection
         let active_rules: Vec<_> = rules.iter().filter(|r| r.status == "active").collect();
-        let effective = active_rules.iter().filter(|r| r.fire_count > 0).count();
-        let effectiveness = if active_rules.is_empty() {
-            0.0
-        } else {
-            (effective as f64 / active_rules.len() as f64) * 100.0
-        };
-
         let proposed = rules.iter().filter(|r| r.status == "proposed").count();
+        let effective = active_rules.iter().filter(|r| r.fire_count > 0).count();
+        let total_fires: i64 = rules.iter().map(|r| r.fire_count).sum();
 
-        let mut summary = format!(
-            "dejavu: {} rules active | {} patterns detected | {:.0}% effectiveness",
-            active_rules.len(),
-            pattern_count,
-            effectiveness,
-        );
+        println!("# claude-dejavu status\n");
 
-        if proposed > 0 {
-            summary.push_str(&format!(" | {} new proposals — run /dejavu", proposed,));
-        }
+        if rules.is_empty() && pattern_count == 0 {
+            // First time — no data yet
+            println!("This project has no learned rules yet. The current session");
+            println!("will be analyzed; subsequent sessions will benefit from");
+            println!("detected antipatterns written to CLAUDE.md.\n");
+            println!("Rule injection starts after the first `claude-dejavu scan`.\n");
+            println!("`/dejavu` is available to review detected patterns.");
+            println!("Otherwise learning happens passively as you work.\n");
+            println!("Dashboard: http://localhost:7777");
+            println!("How it works: `/how-it-works`\n");
+            println!("This message disappears once the first rule is applied.");
+        } else if active_rules.is_empty() && proposed > 0 {
+            // Patterns found but no rules approved yet
+            println!(
+                "{} patterns detected, {} proposed rules awaiting review.\n",
+                pattern_count, proposed
+            );
+            println!("Run `/dejavu` to review and approve proposed rules.\n");
+            println!("Dashboard: http://localhost:7777");
+        } else {
+            // Active rules exist — show status + rules
+            let effectiveness = if active_rules.is_empty() {
+                0.0
+            } else {
+                (effective as f64 / active_rules.len() as f64) * 100.0
+            };
 
-        println!("{}\n", summary);
+            println!(
+                "{} rules active | {} patterns detected | {:.0}% effectiveness | {} fires\n",
+                active_rules.len(),
+                pattern_count,
+                effectiveness,
+                total_fires,
+            );
 
-        for rule in &rules {
-            println!("- {}", rule.text);
+            if proposed > 0 {
+                println!(
+                    "{} new proposals awaiting review — run `/dejavu`\n",
+                    proposed
+                );
+            }
+
+            println!("## Active Rules\n");
+            for rule in &active_rules {
+                println!("- {}", rule.text);
+            }
+
+            println!("\nDashboard: http://localhost:7777");
         }
     }
 

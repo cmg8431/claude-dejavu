@@ -3,8 +3,8 @@
 /**
  * SessionStart hook: Inject learned rules into Claude's context.
  *
- * Reads active rules from SQLite and outputs them as additionalContext
- * so Claude sees the rules at the start of every session.
+ * Calls `claude-dejavu inject --format text` and passes the output
+ * as additionalContext so Claude sees it at session start.
  */
 
 import { findBinary, collectStdin } from './find-binary.js';
@@ -14,7 +14,6 @@ async function main() {
   const stdinData = await collectStdin();
   let cwd = process.cwd();
 
-  // Parse hook input for cwd
   if (stdinData) {
     try {
       const input = JSON.parse(stdinData);
@@ -25,11 +24,18 @@ async function main() {
   const binary = findBinary();
 
   if (!binary) {
-    // No binary available — skip silently
+    // No binary — show install hint
+    const context = [
+      '# claude-dejavu',
+      '',
+      'claude-dejavu binary not found.',
+      'Run `npx claude-dejavu install` to set up.',
+    ].join('\n');
+
     console.log(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
-        additionalContext: '',
+        additionalContext: context,
       },
       continue: true,
       suppressOutput: true,
@@ -37,8 +43,8 @@ async function main() {
     process.exit(0);
   }
 
-  // Call Rust binary to get injectable rules
-  const result = spawnSync(binary, ['inject', '--path', cwd, '--format', 'json'], {
+  // Get status message from Rust binary (text format)
+  const result = spawnSync(binary, ['inject', '--path', cwd, '--format', 'text'], {
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     timeout: 15000,
@@ -47,48 +53,52 @@ async function main() {
   let additionalContext = '';
 
   if (result.status === 0 && result.stdout.trim()) {
-    try {
-      const output = JSON.parse(result.stdout);
-
-      if (output.rules && output.rules.length > 0) {
-        const ruleCount = output.rules.length;
-        const patternCount = output.pattern_count || 0;
-
-        additionalContext = `# claude-dejavu status\n\n`;
-        additionalContext += `${ruleCount} learned rules active, ${patternCount} patterns detected.\n\n`;
-
-        for (const rule of output.rules) {
-          additionalContext += `- ${rule.text}\n`;
-          if (rule.evidence) {
-            additionalContext += `  ↳ ${rule.evidence}\n`;
-          }
-        }
-
-        additionalContext += `\nRun \`/dejavu\` to review rules or \`claude-dejavu stats\` for effectiveness data.\n`;
-      }
-    } catch {
-      // JSON parse failed — use raw output
-      additionalContext = result.stdout.trim();
-    }
+    additionalContext = result.stdout.trim();
   }
 
-  // Also check for pending proposals
+  // If no output from inject, check for pending proposals
   if (!additionalContext) {
-    const scanResult = spawnSync(binary, ['check', '--path', cwd, '--quiet'], {
+    const checkResult = spawnSync(binary, ['check', '--path', cwd, '--quiet'], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 10000,
     });
 
-    if (scanResult.status === 0 && scanResult.stdout.trim()) {
+    if (checkResult.status === 0 && checkResult.stdout.trim()) {
       try {
-        const check = JSON.parse(scanResult.stdout);
+        const check = JSON.parse(checkResult.stdout);
         if (check.pending_count > 0) {
-          additionalContext = `# claude-dejavu\n\n`;
-          additionalContext += `dejavu: ${check.pending_count} new patterns detected. Run \`/dejavu\` to review.\n`;
+          additionalContext = [
+            '# claude-dejavu status',
+            '',
+            `${check.pending_count} new patterns detected. Run \`/dejavu\` to review.`,
+            '',
+            'Dashboard: http://localhost:7777',
+          ].join('\n');
         }
       } catch {}
     }
+  }
+
+  // If still nothing, show first-time message
+  if (!additionalContext) {
+    additionalContext = [
+      '# claude-dejavu status',
+      '',
+      'This project has no learned rules yet. The current session',
+      'will be analyzed; subsequent sessions will benefit from',
+      'detected antipatterns written to CLAUDE.md.',
+      '',
+      'Rule injection starts after the first `claude-dejavu scan`.',
+      '',
+      '`/dejavu` is available to review detected patterns.',
+      'Otherwise learning happens passively as you work.',
+      '',
+      'Dashboard: http://localhost:7777',
+      'How it works: `/how-it-works`',
+      '',
+      'This message disappears once the first rule is applied.',
+    ].join('\n');
   }
 
   console.log(JSON.stringify({
