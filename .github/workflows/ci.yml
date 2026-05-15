@@ -39,5 +39,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci --workspace=packages/cli
-      - run: npx --workspace=packages/cli tsc --noEmit
+      - run: cd packages/cli && npm install --ignore-optional
+      - run: cd packages/cli && npx tsc --noEmit
