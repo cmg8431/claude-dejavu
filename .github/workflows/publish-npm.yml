@@ -7,70 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g. 0.2.0)"
+        description: "Version to publish (e.g. 0.3.0)"
         required: true
 
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            pkg: cli-darwin-arm64
-            binary: claude-dejavu
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            pkg: cli-darwin-x64
-            binary: claude-dejavu
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            pkg: cli-linux-x64-gnu
-            binary: claude-dejavu
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-24.04-arm
-            pkg: cli-linux-arm64-gnu
-            binary: claude-dejavu
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            pkg: cli-win32-x64-msvc
-            binary: claude-dejavu.exe
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build
-        shell: bash
-        run: cargo build --release --target ${{ matrix.target }} -p dejavu-cli
-
-      - name: Strip binary
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: strip target/${{ matrix.target }}/release/${{ matrix.binary }} || true
-
-      - name: Stage binary
-        shell: bash
-        run: |
-          mkdir -p staging/bin
-          cp target/${{ matrix.target }}/release/${{ matrix.binary }} staging/bin/
-          if [ "${{ matrix.os }}" != "windows-latest" ]; then
-            chmod +x staging/bin/${{ matrix.binary }}
-          fi
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.pkg }}
-          path: staging/bin/
-
   publish:
     name: Publish
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,8 +25,6 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
 
-      - uses: oven-sh/setup-bun@v2
-
       - name: Determine version
         id: version
         run: |
@@ -95,49 +35,23 @@ jobs:
             echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Update versions
+      - name: Update version and publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          for pkg in packages/cli-*/package.json packages/cli/package.json; do
-            jq --arg v "$VERSION" '.version = $v' "$pkg" > tmp.json && mv tmp.json "$pkg"
-          done
-          for dep in cli-darwin-arm64 cli-darwin-x64 cli-linux-x64-gnu cli-linux-arm64-gnu cli-win32-x64-msvc; do
-            jq --arg v "$VERSION" --arg d "@claude-dejavu/$dep" '.optionalDependencies[$d] = $v' packages/cli/package.json > tmp.json && mv tmp.json packages/cli/package.json
-          done
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Place binaries and publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          for pkg in cli-darwin-arm64 cli-darwin-x64 cli-linux-x64-gnu cli-linux-arm64-gnu cli-win32-x64-msvc; do
-            mkdir -p "packages/$pkg/bin"
-            cp artifacts/$pkg/* "packages/$pkg/bin/"
-            chmod +x "packages/$pkg/bin/"* 2>/dev/null || true
-            cd "packages/$pkg"
-            npm publish --access public || true
-            cd ../..
-            echo "Published @claude-dejavu/$pkg"
-          done
-
-      - name: Build and publish claude-dejavu
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
           cd packages/cli
-          npm install --ignore-optional
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          npm install --ignore-scripts
           npx tsc
           npm publish --access public
-          echo "Published claude-dejavu"
+          echo "Published claude-dejavu@$VERSION"
 
       - name: Commit version bump
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add packages/*/package.json
+          git add packages/cli/package.json
           git diff --staged --quiet || git commit -m "chore: bump version to $VERSION"
           git push origin main || true
