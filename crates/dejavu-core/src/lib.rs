@@ -1,3 +1,4 @@
+pub mod config;
 pub mod db;
 pub mod detector;
 pub mod parser;
@@ -6,21 +7,27 @@ pub mod rule;
 use anyhow::Result;
 use std::path::Path;
 
+pub use config::DejavuConfig;
 pub use detector::{Detection, DetectorType};
 pub use parser::ParsedSession;
 
 pub struct DejavuEngine {
     pub db_path: std::path::PathBuf,
+    pub config: DejavuConfig,
 }
 
 impl DejavuEngine {
     pub fn new() -> Result<Self> {
         let db_path = db::default_db_path()?;
-        Ok(Self { db_path })
+        let config = DejavuConfig::load()?;
+        Ok(Self { db_path, config })
     }
 
     pub fn with_db_path(db_path: std::path::PathBuf) -> Self {
-        Self { db_path }
+        Self {
+            db_path,
+            config: DejavuConfig::default(),
+        }
     }
 
     pub fn scan(&self, project_path: &Path) -> Result<Vec<Detection>> {
@@ -81,7 +88,7 @@ impl DejavuEngine {
 
         let rules: Vec<(String, Detection)> = detections
             .iter()
-            .filter(|d| d.confidence >= 0.5)
+            .filter(|d| d.confidence >= self.config.confidence_threshold)
             .enumerate()
             .map(|(i, d)| {
                 let id = format!("r-{:03}", next_id + i);

@@ -77,7 +77,9 @@ pub fn run() -> Result<()> {
 
     // Merge hooks
     let dejavu = dejavu_hooks();
-    let dejavu_hooks_map = dejavu.as_object().unwrap();
+    let dejavu_hooks_map = dejavu
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("dejavu hooks template is not an object"))?;
 
     let hooks = settings
         .entry("hooks")
@@ -88,7 +90,9 @@ pub fn run() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("hooks field in settings is not an object"))?;
 
     for (event_name, dejavu_entries) in dejavu_hooks_map {
-        let dejavu_arr = dejavu_entries.as_array().unwrap();
+        let dejavu_arr = dejavu_entries
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("{event_name} dejavu entries is not an array"))?;
 
         let existing = hooks_map
             .entry(event_name)

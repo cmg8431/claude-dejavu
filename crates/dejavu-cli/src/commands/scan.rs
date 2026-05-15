@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub fn run(path: Option<String>, auto: bool) -> Result<()> {
     let project_path = path
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     if !auto {
         println!("{}", "🔍 Scanning session logs...".bold());

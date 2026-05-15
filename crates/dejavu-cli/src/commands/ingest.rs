@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub fn run(buffer_dir: String, path: Option<String>) -> Result<()> {
     let project_path = path
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     let buffer_path = PathBuf::from(&buffer_dir);
     if !buffer_path.exists() {

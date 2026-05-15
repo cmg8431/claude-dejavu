@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub fn run(path: Option<String>) -> Result<()> {
     let project_path = path
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     println!("{}", "👁  dejavu watch mode".bold());
     println!(
@@ -34,8 +34,11 @@ pub fn run(path: Option<String>) -> Result<()> {
 
     loop {
         // Count current session files
-        let files =
-            dejavu_core::parser::find_session_files(&dirs::home_dir().unwrap().join(".claude"))?;
+        let files = dejavu_core::parser::find_session_files(
+            &dirs::home_dir()
+                .ok_or_else(|| anyhow::anyhow!("could not find home directory"))?
+                .join(".claude"),
+        )?;
 
         let current_count = files.len();
 

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub fn run(path: Option<String>, days: i64) -> Result<()> {
     let project_path = path
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     let engine = dejavu_core::DejavuEngine::new()?;
     let dead_rules = engine.find_dead_rules(&project_path, days)?;
@@ -48,7 +48,7 @@ pub fn run(path: Option<String>, days: i64) -> Result<()> {
 pub fn run_apply(path: Option<String>, days: i64) -> Result<()> {
     let project_path = path
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     let engine = dejavu_core::DejavuEngine::new()?;
     let dead_rules = engine.cleanup_dead_rules(&project_path, days)?;

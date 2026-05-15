@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub fn run(path: Option<String>, format: String) -> Result<()> {
     let project_path = path
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     let engine = dejavu_core::DejavuEngine::new()?;
     let conn = dejavu_core::db::open(&engine.db_path)?;
@@ -43,7 +43,30 @@ pub fn run(path: Option<String>, format: String) -> Result<()> {
             return Ok(());
         }
 
-        println!("# claude-dejavu: {} learned rules\n", rules.len());
+        // Compute effectiveness: percentage of active rules that have fired at least once
+        let active_rules: Vec<_> = rules.iter().filter(|r| r.status == "active").collect();
+        let effective = active_rules.iter().filter(|r| r.fire_count > 0).count();
+        let effectiveness = if active_rules.is_empty() {
+            0.0
+        } else {
+            (effective as f64 / active_rules.len() as f64) * 100.0
+        };
+
+        let proposed = rules.iter().filter(|r| r.status == "proposed").count();
+
+        let mut summary = format!(
+            "dejavu: {} rules active | {} patterns detected | {:.0}% effectiveness",
+            active_rules.len(),
+            pattern_count,
+            effectiveness,
+        );
+
+        if proposed > 0 {
+            summary.push_str(&format!(" | {} new proposals — run /dejavu", proposed,));
+        }
+
+        println!("{}\n", summary);
+
         for rule in &rules {
             println!("- {}", rule.text);
         }
