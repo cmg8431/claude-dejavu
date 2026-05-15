@@ -46,9 +46,10 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
 
         let confidence = (file_corrections.len() as f64 * 0.25 + 0.3).min(1.0);
 
+        let short_path = shorten_path(file_path);
         let suggested_rule = format!(
-            "In `{}`, follow the user's preferred style. {} silent corrections detected in past sessions.",
-            file_path,
+            "`{}` was silently corrected {} times after Claude edited it. Read the file carefully before modifying — match the existing code style and patterns.",
+            short_path,
             file_corrections.len(),
         );
 
@@ -162,6 +163,20 @@ fn is_likely_correction(
     }
 
     false
+}
+
+fn shorten_path(path: &str) -> String {
+    for prefix in ["/src/", "/app/", "/pages/", "/components/"] {
+        if let Some(pos) = path.find(prefix) {
+            return path[pos + 1..].to_string();
+        }
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.len() > 3 {
+        parts[parts.len() - 3..].join("/")
+    } else {
+        path.to_string()
+    }
 }
 
 #[cfg(test)]

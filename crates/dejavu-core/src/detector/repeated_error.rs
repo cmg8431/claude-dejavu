@@ -45,11 +45,8 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
 
         let confidence = calculate_confidence(instances.len(), session_ids.len());
 
-        let suggested_rule = format!(
-            "When encountering `{}`, check the common fix pattern observed across {} sessions.",
-            truncate(normalized_error, 80),
-            session_ids.len(),
-        );
+        // Generate specific rule based on error content
+        let suggested_rule = generate_error_rule(normalized_error, instances);
 
         detections.push(Detection {
             detector_type: DetectorType::RepeatedError,
@@ -90,6 +87,58 @@ fn normalize_error(msg: &str) -> String {
     let normalized = re_hex.replace_all(&normalized, "<HEX>");
 
     normalized.to_lowercase()
+}
+
+fn generate_error_rule(normalized: &str, instances: &[ErrorInstance]) -> String {
+    let lower = normalized.to_lowercase();
+
+    // Pattern-specific actionable rules
+    if lower.contains("exit code 128") || lower.contains("fatal: ambiguous argument") {
+        return format!(
+            "Git errors occur frequently ({} times). Verify branch exists with `git branch -a` before git operations.",
+            instances.len()
+        );
+    }
+    if lower.contains("file does not exist") || lower.contains("no such file") {
+        return format!(
+            "File-not-found errors occur frequently ({} times). Verify file paths with `ls` or `find` before reading/editing.",
+            instances.len()
+        );
+    }
+    if lower.contains("eaddrinuse") || lower.contains("address already in use") {
+        return "Port already in use errors are common. Kill existing process with `lsof -ti :PORT | xargs kill` before starting dev server.".to_string();
+    }
+    if lower.contains("module not found") || lower.contains("cannot find module") {
+        return "Module not found errors recur. Check import paths and run `install` after adding dependencies.".to_string();
+    }
+    if lower.contains("type error") || lower.contains("cannot find name") {
+        return "TypeScript type errors recur. Check type definitions and imports before editing."
+            .to_string();
+    }
+    if lower.contains("command not found") {
+        return "Command not found errors recur. Check which package manager and tools are installed in this project.".to_string();
+    }
+    if lower.contains("permission denied") {
+        return "Permission denied errors recur. Check file permissions and use sudo only when necessary.".to_string();
+    }
+    if lower.contains("conflict") || lower.contains("merge") {
+        return format!(
+            "Git merge conflicts occur frequently ({} times). Pull latest changes before starting work.",
+            instances.len()
+        );
+    }
+
+    // Generic fallback — still better than before
+    format!(
+        "Error `{}` occurs repeatedly ({} times across {} sessions). Investigate root cause before retrying.",
+        truncate(normalized, 60),
+        instances.len(),
+        instances
+            .iter()
+            .map(|i| &i.session_id)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    )
 }
 
 fn calculate_confidence(total_occurrences: usize, unique_sessions: usize) -> f64 {

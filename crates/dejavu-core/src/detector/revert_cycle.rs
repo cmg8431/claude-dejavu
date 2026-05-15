@@ -48,9 +48,10 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
 
         let confidence = (cycles.len() as f64 * 0.3).min(1.0);
 
+        let short_path = shorten_path(file_path);
         let suggested_rule = format!(
-            "In `{}`, check existing logic before editing. Past sessions show {} revert cycles in this file.",
-            file_path,
+            "`{}` has been edited and reverted {} times. Read this file fully before making changes — understand the existing logic first.",
+            short_path,
             cycles.len(),
         );
 
@@ -112,6 +113,27 @@ fn find_revert_cycles(edits: &[EditSnapshot]) -> Vec<RevertCycle> {
     }
 
     cycles
+}
+
+fn shorten_path(path: &str) -> String {
+    if let Some(pos) = path.find("/src/") {
+        return path[pos + 1..].to_string();
+    }
+    if let Some(pos) = path.find("/app/") {
+        return path[pos + 1..].to_string();
+    }
+    if let Some(pos) = path.find("/pages/") {
+        return path[pos + 1..].to_string();
+    }
+    if let Some(pos) = path.find("/components/") {
+        return path[pos + 1..].to_string();
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.len() > 3 {
+        parts[parts.len() - 3..].join("/")
+    } else {
+        path.to_string()
+    }
 }
 
 fn text_similarity(a: &str, b: &str) -> f64 {
