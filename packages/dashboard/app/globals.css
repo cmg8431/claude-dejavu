@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface-0: #0a0a0f;
+  --color-surface-1: #111118;
+  --color-surface-2: #1a1a24;
+  --color-surface-3: #232330;
+  --color-border: #2a2a3a;
+  --color-border-hover: #3a3a50;
+  --color-text-primary: #e8e8ed;
+  --color-text-secondary: #8888a0;
+  --color-text-tertiary: #5a5a72;
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-green: #22c55e;
+  --color-green-dim: rgba(34, 197, 94, 0.15);
+  --color-yellow: #eab308;
+  --color-yellow-dim: rgba(234, 179, 8, 0.15);
+  --color-red: #ef4444;
+  --color-red-dim: rgba(239, 68, 68, 0.15);
+  --color-gray: #6b7280;
+  --color-gray-dim: rgba(107, 114, 128, 0.15);
+  --color-blue: #3b82f6;
+  --color-blue-dim: rgba(59, 130, 246, 0.15);
+  --color-purple: #a855f7;
+  --color-purple-dim: rgba(168, 85, 247, 0.15);
+  --color-cyan: #06b6d4;
+  --color-cyan-dim: rgba(6, 182, 212, 0.15);
+  --color-orange: #f97316;
+  --color-orange-dim: rgba(249, 115, 22, 0.15);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+body {
+  background: var(--color-surface-0);
+  color: var(--color-text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-fade-in-delay-1 { animation-delay: 0.05s; }
+.animate-fade-in-delay-2 { animation-delay: 0.1s; }
+.animate-fade-in-delay-3 { animation-delay: 0.15s; }
+.animate-fade-in-delay-4 { animation-delay: 0.2s; }
