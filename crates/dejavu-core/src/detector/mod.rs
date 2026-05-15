@@ -1,3 +1,4 @@
+pub mod long_bash;
 pub mod repeated_error;
 pub mod revert_cycle;
 pub mod silent_fix;
@@ -21,6 +22,7 @@ pub enum DetectorType {
     RepeatedError,
     SilentFix,
     UserCorrection,
+    LongBash,
 }
 
 impl DetectorType {
@@ -30,6 +32,7 @@ impl DetectorType {
             Self::RepeatedError => "repeated_error",
             Self::SilentFix => "silent_fix",
             Self::UserCorrection => "user_correction",
+            Self::LongBash => "long_bash",
         }
     }
 }
@@ -49,6 +52,7 @@ pub fn run_all_detectors(sessions: &[ParsedSession]) -> Vec<Detection> {
     detections.extend(repeated_error::detect(sessions));
     detections.extend(revert_cycle::detect(sessions));
     detections.extend(silent_fix::detect(sessions));
+    detections.extend(long_bash::detect(sessions));
 
     detections.sort_by(|a, b| {
         b.confidence
