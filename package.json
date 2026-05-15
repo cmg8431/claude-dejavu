@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "cargo build --release -p dejavu-cli && bun run build:cli",
+    "build:core": "cargo build --release -p dejavu-cli",
+    "build:cli": "bun run --cwd packages/cli build",
+    "dev": "cargo run -p dejavu-cli --"
+  }
+}
