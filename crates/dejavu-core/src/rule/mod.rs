@@ -42,8 +42,12 @@ pub fn format_rules_plain(rules: &[(String, Detection)]) -> String {
 }
 
 pub fn patch_claude_md(project_path: &Path, rules: &[(String, Detection)]) -> Result<String> {
-    let claude_md_path = project_path.join("CLAUDE.md");
-    patch_target(&claude_md_path, rules)
+    // Write to .claude/rules/dejavu.md (not root CLAUDE.md)
+    // Claude Code reads .claude/rules/*.md automatically
+    // This avoids git noise in the project root
+    let rules_dir = project_path.join(".claude").join("rules");
+    let target = rules_dir.join("dejavu.md");
+    patch_target(&target, rules)
 }
 
 /// Patch any target file with dejavu rules section.
@@ -73,8 +77,9 @@ pub fn patch_target(target_path: &Path, rules: &[(String, Detection)]) -> Result
 }
 
 pub fn write_claude_md(project_path: &Path, content: &str) -> Result<()> {
-    let claude_md_path = project_path.join("CLAUDE.md");
-    std::fs::write(claude_md_path, content)?;
+    let rules_dir = project_path.join(".claude").join("rules");
+    std::fs::create_dir_all(&rules_dir)?;
+    std::fs::write(rules_dir.join("dejavu.md"), content)?;
     Ok(())
 }
 

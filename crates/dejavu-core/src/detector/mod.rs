@@ -1,4 +1,6 @@
+pub mod error_fix_pair;
 pub mod long_bash;
+pub mod project_context;
 pub mod repeated_error;
 pub mod revert_cycle;
 pub mod silent_fix;
@@ -23,6 +25,8 @@ pub enum DetectorType {
     SilentFix,
     UserCorrection,
     LongBash,
+    ProjectContext,
+    ErrorFixPair,
 }
 
 impl DetectorType {
@@ -33,6 +37,8 @@ impl DetectorType {
             Self::SilentFix => "silent_fix",
             Self::UserCorrection => "user_correction",
             Self::LongBash => "long_bash",
+            Self::ProjectContext => "project_context",
+            Self::ErrorFixPair => "error_fix_pair",
         }
     }
 }
@@ -45,9 +51,11 @@ pub struct Evidence {
     pub details: serde_json::Value,
 }
 
+/// Run session-based detectors (need parsed session data).
 pub fn run_all_detectors(sessions: &[ParsedSession]) -> Vec<Detection> {
     let mut detections = Vec::new();
 
+    detections.extend(error_fix_pair::detect(sessions));
     detections.extend(user_correction::detect(sessions));
     detections.extend(repeated_error::detect(sessions));
     detections.extend(revert_cycle::detect(sessions));

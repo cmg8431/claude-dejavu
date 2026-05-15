@@ -55,6 +55,8 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
                 dejavu_core::DetectorType::SilentFix => "silent fix".magenta(),
                 dejavu_core::DetectorType::UserCorrection => "user correction".cyan(),
                 dejavu_core::DetectorType::LongBash => "long bash".blue(),
+                dejavu_core::DetectorType::ProjectContext => "project".green(),
+                dejavu_core::DetectorType::ErrorFixPair => "error→fix".red(),
             };
 
             println!(

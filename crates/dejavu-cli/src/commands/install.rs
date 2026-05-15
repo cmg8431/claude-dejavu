@@ -60,8 +60,53 @@ pub fn run() -> Result<()> {
     // Step 2: Register hooks (safe merge — never overwrites non-dejavu hooks)
     register_hooks()?;
 
-    // Step 3: Bootstrap — scan existing sessions for initial rules
-    println!("\n{}", "Scanning existing session history...".bold());
+    // Step 3: Scan project context (instant rules from config files)
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    println!("\n{}", "Scanning project context...".bold());
+    let context_rules = dejavu_core::detector::project_context::detect_from_project(&cwd);
+    if !context_rules.is_empty() {
+        for rule in &context_rules {
+            println!("  {} {}", "✓".green(), rule.suggested_rule);
+        }
+
+        // Apply context rules to CLAUDE.md
+        let conn = dejavu_core::db::open(&engine.db_path)?;
+        let existing = dejavu_core::db::get_active_rules(&conn, &cwd.to_string_lossy())?;
+        let next_id = existing.len() + 1;
+        let rules_to_apply: Vec<(String, dejavu_core::Detection)> = context_rules
+            .into_iter()
+            .enumerate()
+            .map(|(i, d)| (format!("r-{:03}", next_id + i), d))
+            .collect();
+
+        for (id, det) in &rules_to_apply {
+            dejavu_core::db::insert_rule(
+                &conn,
+                id,
+                &cwd.to_string_lossy(),
+                "project",
+                None,
+                &det.suggested_rule,
+                det.confidence,
+                "[]",
+            )?;
+            dejavu_core::db::update_rule_status(&conn, id, "active")?;
+        }
+
+        // Write to CLAUDE.md (safe — only touches dejavu section)
+        let content = dejavu_core::rule::patch_claude_md(&cwd, &rules_to_apply)?;
+        dejavu_core::rule::write_claude_md(&cwd, &content)?;
+        println!(
+            "  {} {} context rules written to CLAUDE.md",
+            "✓".green(),
+            rules_to_apply.len()
+        );
+    } else {
+        println!("  {} No project config files detected.", "ℹ".blue());
+    }
+
+    // Step 4: Bootstrap — scan existing sessions for initial rules
+    println!("\n{}", "Scanning session history...".bold());
     bootstrap(&engine)?;
 
     println!();
@@ -175,6 +220,8 @@ fn bootstrap(engine: &dejavu_core::DejavuEngine) -> Result<()> {
                 dejavu_core::DetectorType::SilentFix => "silent".magenta(),
                 dejavu_core::DetectorType::UserCorrection => "correction".cyan(),
                 dejavu_core::DetectorType::LongBash => "bash".blue(),
+                dejavu_core::DetectorType::ProjectContext => "project".green(),
+                dejavu_core::DetectorType::ErrorFixPair => "error→fix".red(),
             };
 
             println!(
