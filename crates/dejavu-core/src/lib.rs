@@ -106,17 +106,16 @@ impl DejavuEngine {
         Ok(rules)
     }
 
-    pub fn apply_rules(&self, project_path: &Path, rules: &[(String, Detection)]) -> Result<String> {
+    pub fn apply_rules(
+        &self,
+        project_path: &Path,
+        rules: &[(String, Detection)],
+    ) -> Result<String> {
         rule::patch_claude_md(project_path, rules)
     }
 
     /// Track that a rule "fired" — prevented a repeated mistake.
-    pub fn record_fire(
-        &self,
-        rule_id: &str,
-        session_id: &str,
-        prevented: bool,
-    ) -> Result<()> {
+    pub fn record_fire(&self, rule_id: &str, session_id: &str, prevented: bool) -> Result<()> {
         let conn = db::open(&self.db_path)?;
         db::record_rule_fire(&conn, rule_id, session_id, prevented)?;
         Ok(())

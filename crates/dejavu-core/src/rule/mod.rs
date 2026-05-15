@@ -124,20 +124,20 @@ pub fn write_global_rules(rules: &[(String, Detection)]) -> Result<()> {
 }
 
 fn split_dejavu_section(content: &str) -> (&str, &str, &str) {
-    if let Some(start_pos) = content.find(DEJAVU_SECTION_START) {
-        if let Some(end_pos) = content.find(DEJAVU_SECTION_END) {
-            let end_pos = end_pos + DEJAVU_SECTION_END.len();
-            let end_pos = if content[end_pos..].starts_with('\n') {
-                end_pos + 1
-            } else {
-                end_pos
-            };
-            return (
-                &content[..start_pos],
-                &content[start_pos..end_pos],
-                &content[end_pos..],
-            );
-        }
+    if let Some(start_pos) = content.find(DEJAVU_SECTION_START)
+        && let Some(end_pos) = content.find(DEJAVU_SECTION_END)
+    {
+        let end_pos = end_pos + DEJAVU_SECTION_END.len();
+        let end_pos = if content[end_pos..].starts_with('\n') {
+            end_pos + 1
+        } else {
+            end_pos
+        };
+        return (
+            &content[..start_pos],
+            &content[start_pos..end_pos],
+            &content[end_pos..],
+        );
     }
     (content, "", "")
 }

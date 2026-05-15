@@ -144,12 +144,12 @@ fn is_likely_correction(
     // it's less likely to be a "silent" fix (user probably asked for a change).
     // We want edits that happen without explicit user instruction.
     let _has_user_message_between = session.messages.iter().any(|msg| {
-        if let Some(ref role) = msg.role {
-            if role == "user" {
-                // Check if this message is between the two edits
-                // (simplified: we use message ordering as proxy)
-                return true;
-            }
+        if let Some(ref role) = msg.role
+            && role == "user"
+        {
+            // Check if this message is between the two edits
+            // (simplified: we use message ordering as proxy)
+            return true;
         }
         false
     });

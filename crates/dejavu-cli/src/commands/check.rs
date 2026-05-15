@@ -20,7 +20,10 @@ pub fn run(path: Option<String>, quiet: bool) -> Result<()> {
         println!("{}", serde_json::to_string(&output)?);
     } else {
         if proposed > 0 {
-            println!("dejavu: {} new patterns detected. Run `/dejavu` to review.", proposed);
+            println!(
+                "dejavu: {} new patterns detected. Run `/dejavu` to review.",
+                proposed
+            );
         }
     }
 

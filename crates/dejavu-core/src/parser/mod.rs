@@ -177,11 +177,10 @@ pub fn parse_session(path: &Path) -> Result<ParsedSession> {
                             let tc_idx = tool_calls.len();
 
                             // Extract file edits
-                            if is_file_edit(&tool_name) {
-                                if let Some(edit) = extract_file_edit(&tool_name, &tool_input, idx)
-                                {
-                                    file_edits.push(edit);
-                                }
+                            if is_file_edit(&tool_name)
+                                && let Some(edit) = extract_file_edit(&tool_name, &tool_input, idx)
+                            {
+                                file_edits.push(edit);
                             }
 
                             tool_calls.push(ToolCall {
@@ -294,21 +293,26 @@ fn is_file_edit(tool_name: &str) -> bool {
     matches!(tool_name, "Edit" | "Write" | "NotebookEdit")
 }
 
-fn extract_file_edit(
-    tool_name: &str,
-    input: &serde_json::Value,
-    index: usize,
-) -> Option<FileEdit> {
+fn extract_file_edit(tool_name: &str, input: &serde_json::Value, index: usize) -> Option<FileEdit> {
     let file_path = input.get("file_path")?.as_str()?.to_string();
 
     let (old_content, new_content) = match tool_name {
         "Edit" => (
-            input.get("old_string").and_then(|v| v.as_str()).map(String::from),
-            input.get("new_string").and_then(|v| v.as_str()).map(String::from),
+            input
+                .get("old_string")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            input
+                .get("new_string")
+                .and_then(|v| v.as_str())
+                .map(String::from),
         ),
         "Write" => (
             None,
-            input.get("content").and_then(|v| v.as_str()).map(String::from),
+            input
+                .get("content")
+                .and_then(|v| v.as_str())
+                .map(String::from),
         ),
         _ => (None, None),
     };
@@ -323,14 +327,19 @@ fn extract_file_edit(
 }
 
 fn has_error_indicators(text: &str) -> bool {
-    text.contains("Error:") || text.contains("error:") || text.contains("FAILED")
-        || text.contains("error[") || text.contains("Exit code")
+    text.contains("Error:")
+        || text.contains("error:")
+        || text.contains("FAILED")
+        || text.contains("error[")
+        || text.contains("Exit code")
 }
 
 fn extract_error_line(text: &str) -> String {
     for line in text.lines() {
         let line = line.trim();
-        if line.contains("Error:") || line.contains("error:") || line.contains("FAILED")
+        if line.contains("Error:")
+            || line.contains("error:")
+            || line.contains("FAILED")
             || line.contains("error[")
         {
             return line.to_string();

@@ -25,19 +25,21 @@ pub fn run() -> Result<()> {
         println!("  {} CLAUDE.md found.", "✓".green());
     }
 
-    println!("  {} Database initialized at {:?}", "✓".green(), engine.db_path);
+    println!(
+        "  {} Database initialized at {:?}",
+        "✓".green(),
+        engine.db_path
+    );
     println!("  {} .dejavu/ directory created", "✓".green());
 
     println!();
     println!(
         "{}",
-        "dejavu is ready. Use your project normally with Claude Code."
-            .dimmed()
+        "dejavu is ready. Use your project normally with Claude Code.".dimmed()
     );
     println!(
         "{}",
-        "Run `claude-dejavu scan` after a few sessions to detect patterns."
-            .dimmed()
+        "Run `claude-dejavu scan` after a few sessions to detect patterns.".dimmed()
     );
 
     Ok(())

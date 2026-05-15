@@ -27,12 +27,15 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
 
             if let Some(correction) = patterns.detect_correction(&text) {
                 let key = correction.normalized.clone();
-                corrections.entry(key).or_default().push(CorrectionInstance {
-                    session_id: session.id.clone(),
-                    raw_text: text.clone(),
-                    confidence: correction.confidence,
-                    correction_type: correction.correction_type,
-                });
+                corrections
+                    .entry(key)
+                    .or_default()
+                    .push(CorrectionInstance {
+                        session_id: session.id.clone(),
+                        raw_text: text.clone(),
+                        confidence: correction.confidence,
+                        correction_type: correction.correction_type,
+                    });
             }
         }
     }
@@ -66,7 +69,7 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
             .map(|i| i.correction_type)
             .unwrap_or(CorrectionType::Explicit);
 
-        let suggested_rule = generate_rule_text(normalized, &instances, correction_type);
+        let suggested_rule = generate_rule_text(normalized, instances, correction_type);
 
         detections.push(Detection {
             detector_type: DetectorType::UserCorrection,
@@ -222,10 +225,10 @@ fn extract_text_content(msg: &crate::parser::SessionMessage) -> String {
         Some(serde_json::Value::Array(arr)) => arr
             .iter()
             .filter_map(|v| {
-                if let Some(obj) = v.as_object() {
-                    if obj.get("type").and_then(|t| t.as_str()) == Some("text") {
-                        return obj.get("text").and_then(|t| t.as_str()).map(String::from);
-                    }
+                if let Some(obj) = v.as_object()
+                    && obj.get("type").and_then(|t| t.as_str()) == Some("text")
+                {
+                    return obj.get("text").and_then(|t| t.as_str()).map(String::from);
                 }
                 None
             })
@@ -285,7 +288,11 @@ fn generate_rule_text(
             )
         }
         CorrectionType::Approval => {
-            format!("Keep doing: {} (Approved {} time(s).)", cleaned, instances.len())
+            format!(
+                "Keep doing: {} (Approved {} time(s).)",
+                cleaned,
+                instances.len()
+            )
         }
     }
 }

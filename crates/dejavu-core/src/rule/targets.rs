@@ -47,17 +47,17 @@ pub fn discover_targets(project_path: &Path) -> Vec<RuleTarget> {
 
     // 1. .claude/rules/ directory
     let rules_dir = project_path.join(".claude").join("rules");
-    if rules_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&rules_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "md") {
-                    targets.push(RuleTarget {
-                        path,
-                        target_type: TargetType::Rules,
-                        exists: true,
-                    });
-                }
+    if rules_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&rules_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "md") {
+                targets.push(RuleTarget {
+                    path,
+                    target_type: TargetType::Rules,
+                    exists: true,
+                });
             }
         }
     }
@@ -107,10 +107,7 @@ pub fn discover_targets(project_path: &Path) -> Vec<RuleTarget> {
 }
 
 /// Determine the best target for a given rule scope.
-pub fn best_target_for_scope(
-    targets: &[RuleTarget],
-    scope: RuleScope,
-) -> Option<&RuleTarget> {
+pub fn best_target_for_scope(targets: &[RuleTarget], scope: RuleScope) -> Option<&RuleTarget> {
     match scope {
         RuleScope::Global => targets
             .iter()
@@ -119,9 +116,7 @@ pub fn best_target_for_scope(
             .iter()
             .find(|t| t.target_type == TargetType::ProjectClaudeMd)
             .or_else(|| targets.iter().find(|t| t.target_type == TargetType::Rules)),
-        RuleScope::File(_) => targets
-            .iter()
-            .find(|t| t.target_type == TargetType::Rules),
+        RuleScope::File(_) => targets.iter().find(|t| t.target_type == TargetType::Rules),
         RuleScope::Personal => targets
             .iter()
             .find(|t| t.target_type == TargetType::LocalClaudeMd),
@@ -141,10 +136,7 @@ pub enum RuleScope {
 }
 
 /// Determine the scope of a detected pattern based on evidence.
-pub fn infer_scope(
-    detection: &crate::detector::Detection,
-    project_count: usize,
-) -> RuleScope {
+pub fn infer_scope(detection: &crate::detector::Detection, project_count: usize) -> RuleScope {
     // If the same pattern appears across multiple projects → global
     if project_count > 1 {
         return RuleScope::Global;

@@ -78,8 +78,8 @@ pub fn detect(sessions: &[ParsedSession]) -> Vec<Detection> {
                 },
                 confidence,
                 suggested_rule: format!(
-                    "Session had {}x more Bash calls than average ({} vs {:.0}). Consider checking approach before extensive debugging.",
-                    format!("{:.1}", bash_count as f64 / avg),
+                    "Session had {:.1}x more Bash calls than average ({} vs {:.0}). Consider checking approach before extensive debugging.",
+                    bash_count as f64 / avg,
                     bash_count,
                     avg,
                 ),
@@ -136,9 +136,5 @@ fn normalize_error_key(msg: &str) -> String {
 }
 
 fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
-    }
+    if s.len() <= max { s } else { &s[..max] }
 }

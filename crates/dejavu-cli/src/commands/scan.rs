@@ -19,8 +19,7 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
             println!("  {} No antipatterns detected yet.", "ℹ".blue());
             println!(
                 "  {}",
-                "Keep using Claude Code — dejavu will find patterns over time."
-                    .dimmed()
+                "Keep using Claude Code — dejavu will find patterns over time.".dimmed()
             );
         }
         return Ok(());
@@ -38,10 +37,7 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
 
     if rules.is_empty() {
         if !auto {
-            println!(
-                "  {} No rules with sufficient confidence yet.",
-                "ℹ".blue()
-            );
+            println!("  {} No rules with sufficient confidence yet.", "ℹ".blue());
         }
         return Ok(());
     }
@@ -58,7 +54,7 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
                 dejavu_core::DetectorType::RepeatedError => "repeated error".red(),
                 dejavu_core::DetectorType::SilentFix => "silent fix".magenta(),
                 dejavu_core::DetectorType::UserCorrection => "user correction".cyan(),
-            dejavu_core::DetectorType::LongBash => "long bash".blue(),
+                dejavu_core::DetectorType::LongBash => "long bash".blue(),
             };
 
             println!(
@@ -74,7 +70,11 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
             println!("│ Confidence: {:.2}", detection.confidence);
             println!("└──────────────────────────────────────────────────");
 
-            let options = vec!["Yes — apply this rule", "No — skip", "Edit — modify rule text"];
+            let options = vec![
+                "Yes — apply this rule",
+                "No — skip",
+                "Edit — modify rule text",
+            ];
             let answer = inquire::Select::new("Apply?", options)
                 .with_help_message("↑↓ to move, Enter to select")
                 .prompt();
@@ -127,7 +127,10 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
             approved_rules.len()
         );
     } else {
-        eprintln!("dejavu: {} rules applied to CLAUDE.md", approved_rules.len());
+        eprintln!(
+            "dejavu: {} rules applied to CLAUDE.md",
+            approved_rules.len()
+        );
     }
 
     Ok(())

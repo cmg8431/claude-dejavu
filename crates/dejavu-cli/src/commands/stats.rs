@@ -11,8 +11,7 @@ pub fn run(path: Option<String>) -> Result<()> {
     let conn = dejavu_core::db::open(&engine.db_path)?;
 
     let rules = dejavu_core::db::get_active_rules(&conn, &project_path.to_string_lossy())?;
-    let pattern_count =
-        dejavu_core::db::get_pattern_count(&conn, &project_path.to_string_lossy())?;
+    let pattern_count = dejavu_core::db::get_pattern_count(&conn, &project_path.to_string_lossy())?;
 
     println!("{}\n", "📊 claude-dejavu stats".bold());
 
@@ -36,10 +35,7 @@ pub fn run(path: Option<String>) -> Result<()> {
         .count();
     if !rules.is_empty() {
         let effectiveness = (effective as f64 / rules.len() as f64) * 100.0;
-        println!(
-            "  Effectiveness:      {:.0}%",
-            effectiveness
-        );
+        println!("  Effectiveness:      {:.0}%", effectiveness);
     }
 
     // Suggest dead rule cleanup

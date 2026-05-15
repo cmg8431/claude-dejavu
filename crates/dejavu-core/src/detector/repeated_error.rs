@@ -99,9 +99,5 @@ fn calculate_confidence(total_occurrences: usize, unique_sessions: usize) -> f64
 }
 
 fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
-    }
+    if s.len() <= max { s } else { &s[..max] }
 }

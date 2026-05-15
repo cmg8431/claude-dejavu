@@ -21,7 +21,11 @@ pub fn run(path: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    println!("{} {} learned rules:\n", "📋".to_string().bold(), rules.len());
+    println!(
+        "{} {} learned rules:\n",
+        "📋".to_string().bold(),
+        rules.len()
+    );
 
     for rule in &rules {
         let status_badge = match rule.status.as_str() {

@@ -30,11 +30,18 @@ pub fn insert_pattern(
     conn.execute(
         "INSERT INTO patterns (detector_type, project_path, session_id, evidence_json, cluster_id)
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![detector_type, project_path, session_id, evidence_json, cluster_id],
+        rusqlite::params![
+            detector_type,
+            project_path,
+            session_id,
+            evidence_json,
+            cluster_id
+        ],
     )?;
     Ok(conn.last_insert_rowid())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn insert_rule(
     conn: &Connection,
     id: &str,
@@ -85,6 +92,7 @@ pub fn get_pattern_count(conn: &Connection, project_path: &str) -> Result<i64> {
     Ok(count)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn insert_correction(
     conn: &Connection,
     session_id: &str,
@@ -103,7 +111,10 @@ pub fn insert_correction(
     Ok(conn.last_insert_rowid())
 }
 
-pub fn get_unprocessed_corrections(conn: &Connection, project_path: &str) -> Result<Vec<Correction>> {
+pub fn get_unprocessed_corrections(
+    conn: &Connection,
+    project_path: &str,
+) -> Result<Vec<Correction>> {
     let mut stmt = conn.prepare(
         "SELECT id, session_id, project_path, prompt_text, correction_type, confidence, matched_text, captured_text, created_at
          FROM corrections WHERE project_path = ?1 AND processed = 0
