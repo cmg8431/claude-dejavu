@@ -1,0 +1,21 @@
+{
+  "name": "@claude-dejavu/cli-linux-arm64-gnu",
+  "version": "0.1.0",
+  "description": "claude-dejavu CLI binary for linux arm64",
+  "license": "MIT",
+  "type": "module",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "bin/claude-dejavu",
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

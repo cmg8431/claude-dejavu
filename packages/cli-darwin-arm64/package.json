@@ -1,0 +1,21 @@
+{
+  "name": "@claude-dejavu/cli-darwin-arm64",
+  "version": "0.1.0",
+  "description": "claude-dejavu CLI binary for darwin arm64",
+  "license": "MIT",
+  "type": "module",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "bin/claude-dejavu",
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}
