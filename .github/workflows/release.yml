@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: claude-dejavu-darwin-arm64.tar.gz
+            binary: claude-dejavu
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: claude-dejavu-darwin-x64.tar.gz
+            binary: claude-dejavu
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: claude-dejavu-linux-x64.tar.gz
+            binary: claude-dejavu
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            artifact: claude-dejavu-linux-arm64.tar.gz
+            binary: claude-dejavu
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: claude-dejavu-win-x64.zip
+            binary: claude-dejavu.exe
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        shell: bash
+        run: cargo build --release --target ${{ matrix.target }} -p dejavu-cli
+
+      - name: Strip binary
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: strip target/${{ matrix.target }}/release/${{ matrix.binary }} || true
+
+      - name: Package (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.artifact }} ${{ matrix.binary }}
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../${{ matrix.artifact }} ${{ matrix.binary }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/*
