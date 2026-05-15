@@ -105,6 +105,82 @@ const TOOLS = [
       },
     },
   },
+  {
+    name: 'add_rule',
+    description: 'Add a manual rule to CLAUDE.md. Use when user says "remember this", "add a rule", or states a preference.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          description: 'The rule text to add',
+        },
+        project_path: {
+          type: 'string',
+          description: 'Project path',
+        },
+        scope: {
+          type: 'string',
+          description: 'Rule scope: project, global, or personal',
+          enum: ['project', 'global', 'personal'],
+        },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'edit_rule',
+    description: 'Edit an existing rule text. Use when user wants to modify or refine a rule.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        rule_id: {
+          type: 'string',
+          description: 'Rule ID (e.g. r-001)',
+        },
+        new_text: {
+          type: 'string',
+          description: 'New rule text',
+        },
+        project_path: {
+          type: 'string',
+          description: 'Project path',
+        },
+      },
+      required: ['rule_id', 'new_text'],
+    },
+  },
+  {
+    name: 'remove_rule',
+    description: 'Remove a rule. Use when user wants to delete or disable a rule.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        rule_id: {
+          type: 'string',
+          description: 'Rule ID (e.g. r-001)',
+        },
+        project_path: {
+          type: 'string',
+          description: 'Project path',
+        },
+      },
+      required: ['rule_id'],
+    },
+  },
+  {
+    name: 'rule_feedback',
+    description: 'Get effectiveness feedback for all rules. Shows which rules are working and which are dormant.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_path: {
+          type: 'string',
+          description: 'Project path',
+        },
+      },
+    },
+  },
 ];
 
 async function handleMessage(message) {
@@ -158,6 +234,27 @@ async function handleMessage(message) {
       case 'scan_patterns': {
         const output = callBinary(['scan', '--path', projectPath, '--auto']);
         content = output || 'Scan complete.';
+        break;
+      }
+      case 'add_rule': {
+        const scope = args?.scope || 'project';
+        const output = callBinary(['rules', 'add', args.text, '--scope', scope, '--path', projectPath]);
+        content = output || `Rule added: "${args.text}"`;
+        break;
+      }
+      case 'edit_rule': {
+        const output = callBinary(['rules', 'edit', args.rule_id, args.new_text, '--path', projectPath]);
+        content = output || `Rule ${args.rule_id} updated.`;
+        break;
+      }
+      case 'remove_rule': {
+        const output = callBinary(['rules', 'remove', args.rule_id, '--path', projectPath]);
+        content = output || `Rule ${args.rule_id} removed.`;
+        break;
+      }
+      case 'rule_feedback': {
+        const output = callBinary(['rules', 'feedback', '--path', projectPath]);
+        content = output || 'No rules to report on.';
         break;
       }
       default:

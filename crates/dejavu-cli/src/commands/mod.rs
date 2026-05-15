@@ -5,6 +5,7 @@ pub mod init;
 pub mod inject;
 pub mod install;
 pub mod list;
+pub mod rules;
 pub mod scan;
 pub mod stats;
 pub mod ui;

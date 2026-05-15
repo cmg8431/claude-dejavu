@@ -174,6 +174,14 @@ pub fn insert_promotion(
     Ok(())
 }
 
+pub fn update_rule_text(conn: &Connection, rule_id: &str, text: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE rules SET text = ?1 WHERE id = ?2",
+        rusqlite::params![text, rule_id],
+    )?;
+    Ok(())
+}
+
 pub fn get_global_rules(conn: &Connection) -> Result<Vec<Rule>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_path, scope, scope_target, text, confidence, created_at, last_fired, fire_count, status

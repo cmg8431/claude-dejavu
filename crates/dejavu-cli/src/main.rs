@@ -87,6 +87,11 @@ enum Commands {
         #[arg(long)]
         stop: bool,
     },
+    /// Manage rules: add, edit, remove, feedback
+    Rules {
+        #[command(subcommand)]
+        action: RulesAction,
+    },
     /// Find and remove dead rules (no fires in N days)
     Cleanup {
         /// Project path
@@ -98,6 +103,45 @@ enum Commands {
         /// Actually remove dead rules
         #[arg(long)]
         apply: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum RulesAction {
+    /// Add a manual rule
+    Add {
+        /// Rule text
+        text: String,
+        /// Scope: project, global, personal
+        #[arg(long, default_value = "project")]
+        scope: String,
+        /// Project path
+        #[arg(short, long)]
+        path: Option<String>,
+    },
+    /// Edit an existing rule's text
+    Edit {
+        /// Rule ID (e.g. r-001)
+        id: String,
+        /// New rule text
+        text: String,
+        /// Project path
+        #[arg(short, long)]
+        path: Option<String>,
+    },
+    /// Remove a rule
+    Remove {
+        /// Rule ID (e.g. r-001)
+        id: String,
+        /// Project path
+        #[arg(short, long)]
+        path: Option<String>,
+    },
+    /// Show rule effectiveness feedback
+    Feedback {
+        /// Project path
+        #[arg(short, long)]
+        path: Option<String>,
     },
 }
 
@@ -126,6 +170,12 @@ fn main() -> anyhow::Result<()> {
                 commands::ui::run(port, background)
             }
         }
+        Commands::Rules { action } => match action {
+            RulesAction::Add { text, scope, path } => commands::rules::add(path, text, scope),
+            RulesAction::Edit { id, text, path } => commands::rules::edit(path, id, text),
+            RulesAction::Remove { id, path } => commands::rules::remove(path, id),
+            RulesAction::Feedback { path } => commands::rules::feedback(path),
+        },
         Commands::Cleanup { path, days, apply } => {
             if apply {
                 commands::cleanup::run_apply(path, days)
