@@ -16,4 +16,5 @@ colored = { workspace = true }
 anyhow = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+inquire = { workspace = true }
 dirs = { workspace = true }

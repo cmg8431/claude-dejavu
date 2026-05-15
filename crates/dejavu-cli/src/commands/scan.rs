@@ -46,13 +46,19 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
         return Ok(());
     }
 
-    if !auto {
+    // Interactive mode: ask user for each rule
+    let approved_rules = if auto {
+        rules.clone()
+    } else {
+        let mut approved = Vec::new();
+
         for (id, detection) in &rules {
             let detector_label = match detection.detector_type {
                 dejavu_core::DetectorType::RevertCycle => "revert cycle".yellow(),
                 dejavu_core::DetectorType::RepeatedError => "repeated error".red(),
                 dejavu_core::DetectorType::SilentFix => "silent fix".magenta(),
-            dejavu_core::DetectorType::UserCorrection => "user correction".cyan(),
+                dejavu_core::DetectorType::UserCorrection => "user correction".cyan(),
+            dejavu_core::DetectorType::LongBash => "long bash".blue(),
             };
 
             println!(
@@ -66,23 +72,62 @@ pub fn run(path: Option<String>, auto: bool) -> Result<()> {
                 detection.evidence.occurrences,
             );
             println!("│ Confidence: {:.2}", detection.confidence);
-            println!("│ Apply? [y/n/edit]");
             println!("└──────────────────────────────────────────────────");
-            println!();
+
+            let options = vec!["Yes — apply this rule", "No — skip", "Edit — modify rule text"];
+            let answer = inquire::Select::new("Apply?", options)
+                .with_help_message("↑↓ to move, Enter to select")
+                .prompt();
+
+            match answer {
+                Ok(choice) => {
+                    if choice.starts_with("Yes") {
+                        approved.push((id.clone(), detection.clone()));
+                        println!("  {} Applied.\n", "✓".green());
+                    } else if choice.starts_with("Edit") {
+                        let edited = inquire::Text::new("Rule text:")
+                            .with_default(&detection.suggested_rule)
+                            .prompt();
+
+                        if let Ok(new_text) = edited {
+                            let mut modified = detection.clone();
+                            modified.suggested_rule = new_text;
+                            approved.push((id.clone(), modified));
+                            println!("  {} Applied (edited).\n", "✓".green());
+                        } else {
+                            println!("  {} Skipped.\n", "–".dimmed());
+                        }
+                    } else {
+                        println!("  {} Skipped.\n", "–".dimmed());
+                    }
+                }
+                Err(_) => {
+                    println!("  {} Skipped.\n", "–".dimmed());
+                }
+            }
         }
+
+        approved
+    };
+
+    if approved_rules.is_empty() {
+        if !auto {
+            println!("  {} No rules applied.", "ℹ".blue());
+        }
+        return Ok(());
     }
 
-    let content = engine.apply_rules(&project_path, &rules)?;
+    let content = engine.apply_rules(&project_path, &approved_rules)?;
     dejavu_core::rule::write_claude_md(&project_path, &content)?;
 
     if !auto {
         println!(
             "  {} {} rules written to CLAUDE.md",
             "✓".green(),
-            rules.len()
+            approved_rules.len()
         );
     } else {
-        eprintln!("dejavu: {} rules applied to CLAUDE.md", rules.len());
+        eprintln!("dejavu: {} rules applied to CLAUDE.md", approved_rules.len());
     }
 
     Ok(())
