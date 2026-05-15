@@ -1,0 +1,143 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.filterGroup {
+  display: flex;
+  gap: 4px;
+}
+
+.separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 8px;
+}
+
+.filterBtn {
+  padding: 4px 10px;
+  border-radius: var(--radius-badge);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.filterBtn:hover {
+  border-color: var(--border-hover);
+}
+
+.filterBtnActive {
+  border-color: transparent;
+}
+
+.levelDebug {
+  color: var(--log-debug);
+}
+
+.levelDebugActive {
+  background: rgba(250, 249, 245, 0.08);
+  color: var(--text);
+}
+
+.levelInfo {
+  color: var(--log-info);
+}
+
+.levelInfoActive {
+  background: rgba(92, 140, 224, 0.15);
+  color: var(--log-info);
+}
+
+.levelWarn {
+  color: var(--log-warn);
+}
+
+.levelWarnActive {
+  background: rgba(232, 165, 90, 0.15);
+  color: var(--log-warn);
+}
+
+.levelError {
+  color: var(--log-error);
+}
+
+.levelErrorActive {
+  background: rgba(224, 92, 92, 0.15);
+  color: var(--log-error);
+}
+
+.componentBtn {
+  color: var(--text-muted);
+}
+
+.componentBtnActive {
+  background: var(--bg-card-hover);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
+.logArea {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.logLine {
+  white-space: pre;
+  padding: 1px 0;
+}
+
+.logTimestamp {
+  color: var(--text-dim);
+}
+
+.logLevelDebug {
+  color: var(--log-debug);
+}
+
+.logLevelInfo {
+  color: var(--log-info);
+}
+
+.logLevelWarn {
+  color: var(--log-warn);
+}
+
+.logLevelError {
+  color: var(--log-error);
+}
+
+.logComponent {
+  color: var(--text-muted);
+}
+
+.logMessage {
+  color: var(--text);
+}
+
+.empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 48px 20px;
+  font-size: 14px;
+  font-family: var(--font-body);
+}

@@ -1,0 +1,48 @@
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--navbar-height);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+}
+
+.logo {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text);
+  letter-spacing: -0.3px;
+  user-select: none;
+}
+
+.logoEmoji {
+  margin-right: 6px;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.githubLink {
+  color: var(--text-muted);
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.githubLink:hover {
+  color: var(--text);
+}
+
+.githubLink svg {
+  width: 20px;
+  height: 20px;
+}

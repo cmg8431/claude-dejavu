@@ -1,0 +1,127 @@
+.wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-spacing: 0;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.table tr:hover td {
+  background: var(--bg-card);
+}
+
+.grade {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bg);
+}
+
+.gradeA {
+  background: var(--grade-a);
+}
+
+.gradeB {
+  background: var(--grade-b);
+}
+
+.gradeC {
+  background: var(--grade-c);
+}
+
+.gradeD {
+  background: var(--grade-d);
+}
+
+.ruleText {
+  color: var(--text);
+  line-height: 1.4;
+  max-width: 360px;
+}
+
+.confidenceBar {
+  width: 80px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.confidenceFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.confidenceValue {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.fires {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-badge);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pillActive {
+  background: rgba(92, 200, 181, 0.15);
+  color: var(--status-active);
+}
+
+.pillProposed {
+  background: rgba(232, 165, 90, 0.15);
+  color: var(--status-proposed);
+}
+
+.pillDead {
+  background: rgba(250, 249, 245, 0.06);
+  color: var(--status-dead);
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 48px 20px;
+  font-size: 14px;
+}

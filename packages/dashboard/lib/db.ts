@@ -3,24 +3,75 @@ import path from "path";
 import os from "os";
 import fs from "fs";
 
+// ── Types ──
+
+export interface Rule {
+  id: string;
+  project_path: string;
+  scope: string;
+  scope_target: string | null;
+  text: string;
+  confidence: number;
+  created_at: string;
+  last_fired: string | null;
+  fire_count: number;
+  source_patterns: string;
+  status: string;
+}
+
+export interface Pattern {
+  id: number;
+  detector_type: string;
+  project_path: string;
+  session_id: string;
+  detected_at: string;
+  evidence_json: string;
+  cluster_id: string | null;
+}
+
+export interface FeedItem {
+  id: string;
+  type: "pattern" | "rule";
+  detector_type: string;
+  project_path: string;
+  text: string;
+  timestamp: string;
+  confidence?: number;
+  status?: string;
+  fire_count?: number;
+}
+
+export interface OverviewStats {
+  totalPatterns: number;
+  activeRules: number;
+  effectiveness: number;
+  totalFires: number;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  component: string;
+  message: string;
+}
+
+// ── DB connection ──
+
 let db: Database.Database | null = null;
 
 function getDbPath(): string {
-  const platform = process.platform;
-  let dataDir: string;
-
-  if (platform === "darwin") {
-    dataDir = path.join(os.homedir(), "Library", "Application Support", "claude-dejavu");
-  } else if (platform === "win32") {
-    dataDir = path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "claude-dejavu");
-  } else {
-    dataDir = path.join(
-      process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"),
-      "claude-dejavu"
+  if (process.platform === "darwin") {
+    return path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "claude-dejavu",
+      "dejavu.db"
     );
   }
-
-  return path.join(dataDir, "dejavu.db");
+  const dataDir =
+    process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
+  return path.join(dataDir, "claude-dejavu", "dejavu.db");
 }
 
 export function getDb(): Database.Database {
@@ -29,7 +80,6 @@ export function getDb(): Database.Database {
   const dbPath = getDbPath();
 
   if (!fs.existsSync(dbPath)) {
-    // Create directory and empty DB if it doesn't exist
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   }
 
@@ -37,7 +87,6 @@ export function getDb(): Database.Database {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
-  // Ensure tables exist
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -107,128 +156,203 @@ export function getDb(): Database.Database {
 
 // ── Query helpers ──
 
-export interface Rule {
-  id: string;
-  project_path: string;
-  scope: string;
-  scope_target: string | null;
-  text: string;
-  confidence: number;
-  created_at: string;
-  last_fired: string | null;
-  fire_count: number;
-  source_patterns: string;
-  status: string;
+export function getProjects(): string[] {
+  const d = getDb();
+  const fromPatterns = d
+    .prepare("SELECT DISTINCT project_path FROM patterns ORDER BY project_path")
+    .all() as { project_path: string }[];
+  const fromRules = d
+    .prepare("SELECT DISTINCT project_path FROM rules ORDER BY project_path")
+    .all() as { project_path: string }[];
+
+  const set = new Set<string>();
+  for (const r of fromPatterns) set.add(r.project_path);
+  for (const r of fromRules) set.add(r.project_path);
+  return Array.from(set).sort();
 }
 
-export interface Pattern {
-  id: number;
-  detector_type: string;
-  project_path: string;
-  session_id: string;
-  detected_at: string;
-  evidence_json: string;
-  cluster_id: string | null;
+export function getOverviewStats(project?: string): OverviewStats {
+  const d = getDb();
+  const where = project ? "WHERE project_path = ?" : "";
+  const params = project ? [project] : [];
+
+  const totalPatterns =
+    (
+      d
+        .prepare(`SELECT COUNT(*) as c FROM patterns ${where}`)
+        .get(...params) as any
+    )?.c ?? 0;
+
+  const activeRules =
+    (
+      d
+        .prepare(
+          `SELECT COUNT(*) as c FROM rules WHERE status = 'active' ${project ? "AND project_path = ?" : ""}`
+        )
+        .get(...params) as any
+    )?.c ?? 0;
+
+  const totalFires =
+    (
+      d
+        .prepare(
+          `SELECT COALESCE(SUM(fire_count), 0) as c FROM rules ${where}`
+        )
+        .get(...params) as any
+    )?.c ?? 0;
+
+  const totalRules =
+    (
+      d
+        .prepare(`SELECT COUNT(*) as c FROM rules ${where}`)
+        .get(...params) as any
+    )?.c ?? 0;
+
+  const effectiveness =
+    totalRules > 0 ? Math.round((activeRules / totalRules) * 100) : 0;
+
+  return { totalPatterns, activeRules, effectiveness, totalFires };
 }
 
-export interface RuleFire {
-  id: number;
-  rule_id: string;
-  session_id: string;
-  fired_at: string;
-  prevented: number;
-}
+export function getFeed(project?: string): FeedItem[] {
+  const d = getDb();
 
-export function getOverviewStats() {
-  const db = getDb();
-
-  const totalPatterns = (db.prepare("SELECT COUNT(*) as count FROM patterns").get() as any)?.count ?? 0;
-  const activeRules = (db.prepare("SELECT COUNT(*) as count FROM rules WHERE status = 'active'").get() as any)?.count ?? 0;
-  const totalRules = (db.prepare("SELECT COUNT(*) as count FROM rules").get() as any)?.count ?? 0;
-  const totalFireCount = (db.prepare("SELECT COALESCE(SUM(fire_count), 0) as count FROM rules").get() as any)?.count ?? 0;
-  const totalRuleFires = (db.prepare("SELECT COUNT(*) as count FROM rule_fires").get() as any)?.count ?? 0;
-  const preventedFires = (db.prepare("SELECT COUNT(*) as count FROM rule_fires WHERE prevented = 1").get() as any)?.count ?? 0;
-
-  const effectiveness = totalRuleFires > 0 ? Math.round((preventedFires / totalRuleFires) * 100) : 0;
-
-  return {
-    totalPatterns,
-    activeRules,
-    totalRules,
-    totalFireCount,
-    effectiveness,
-  };
-}
-
-export function getAllRules(status?: string): Rule[] {
-  const db = getDb();
-  if (status && status !== "all") {
-    return db.prepare("SELECT * FROM rules WHERE status = ? ORDER BY created_at DESC").all(status) as Rule[];
+  let patterns: Pattern[];
+  if (project) {
+    patterns = d
+      .prepare(
+        "SELECT * FROM patterns WHERE project_path = ? ORDER BY detected_at DESC LIMIT 200"
+      )
+      .all(project) as Pattern[];
+  } else {
+    patterns = d
+      .prepare("SELECT * FROM patterns ORDER BY detected_at DESC LIMIT 200")
+      .all() as Pattern[];
   }
-  return db.prepare("SELECT * FROM rules ORDER BY created_at DESC").all() as Rule[];
-}
 
-export function getTimelineEvents() {
-  const db = getDb();
+  let rules: Rule[];
+  if (project) {
+    rules = d
+      .prepare(
+        "SELECT * FROM rules WHERE project_path = ? ORDER BY created_at DESC LIMIT 200"
+      )
+      .all(project) as Rule[];
+  } else {
+    rules = d
+      .prepare("SELECT * FROM rules ORDER BY created_at DESC LIMIT 200")
+      .all() as Rule[];
+  }
 
-  const ruleCreations = db.prepare(
-    "SELECT id, text, status, created_at as timestamp, 'rule_created' as event_type, confidence, detector_type FROM rules LEFT JOIN (SELECT DISTINCT cluster_id, detector_type FROM patterns) p ON 1=0 ORDER BY created_at DESC"
-  ).all() as any[];
-
-  // Get actual rule creation events
-  const rules = db.prepare(
-    "SELECT id, text, status, created_at as timestamp, 'rule_created' as event_type, confidence FROM rules ORDER BY created_at DESC"
-  ).all() as any[];
-
-  // Get fire events
-  const fires = db.prepare(
-    `SELECT rf.id, r.text, r.id as rule_id, rf.fired_at as timestamp, 'rule_fired' as event_type, rf.prevented
-     FROM rule_fires rf JOIN rules r ON rf.rule_id = r.id
-     ORDER BY rf.fired_at DESC`
-  ).all() as any[];
-
-  // Get dead rules
-  const deadRules = db.prepare(
-    "SELECT id, text, status, created_at as timestamp, 'rule_died' as event_type, confidence FROM rules WHERE status = 'dead' ORDER BY created_at DESC"
-  ).all() as any[];
-
-  // Get pattern detections
-  const patterns = db.prepare(
-    "SELECT id, detector_type, detected_at as timestamp, 'pattern_detected' as event_type, project_path FROM patterns ORDER BY detected_at DESC LIMIT 50"
-  ).all() as any[];
-
-  const events = [...rules, ...fires, ...deadRules, ...patterns];
-  events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  return events;
-}
-
-export function getDetectorStats() {
-  const db = getDb();
-
-  const detectorTypes = ["revert_cycle", "repeated_error", "silent_fix", "user_correction"];
-
-  return detectorTypes.map((type) => {
-    const patternCount = (db.prepare("SELECT COUNT(*) as count FROM patterns WHERE detector_type = ?").get(type) as any)?.count ?? 0;
-
-    const recentDetections = db.prepare(
-      "SELECT id, detector_type, project_path, detected_at, evidence_json FROM patterns WHERE detector_type = ? ORDER BY detected_at DESC LIMIT 5"
-    ).all(type) as Pattern[];
-
-    const ruleCount = (db.prepare(
-      `SELECT COUNT(DISTINCT r.id) as count FROM rules r
-       WHERE EXISTS (
-         SELECT 1 FROM patterns p
-         WHERE p.detector_type = ?
-         AND p.cluster_id IS NOT NULL
-       )`
-    ).get(type) as any)?.count ?? 0;
-
+  const patternItems: FeedItem[] = patterns.map((p) => {
+    let text = `${p.detector_type} detected`;
+    try {
+      const ev = JSON.parse(p.evidence_json);
+      text = ev.description || ev.summary || ev.message || text;
+    } catch {
+      /* ignore */
+    }
     return {
-      type,
-      patternCount,
-      ruleCount,
-      recentDetections,
+      id: `p-${p.id}`,
+      type: "pattern",
+      detector_type: p.detector_type,
+      project_path: p.project_path,
+      text,
+      timestamp: p.detected_at,
     };
   });
+
+  const ruleItems: FeedItem[] = rules.map((r) => ({
+    id: `r-${r.id}`,
+    type: "rule",
+    detector_type: "rule",
+    project_path: r.project_path,
+    text: r.text,
+    timestamp: r.created_at,
+    confidence: r.confidence,
+    status: r.status,
+    fire_count: r.fire_count,
+  }));
+
+  const all = [...patternItems, ...ruleItems];
+  all.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  return all.slice(0, 50);
+}
+
+export function getAllRules(project?: string): Rule[] {
+  const d = getDb();
+  if (project) {
+    return d
+      .prepare(
+        "SELECT * FROM rules WHERE project_path = ? ORDER BY created_at DESC"
+      )
+      .all(project) as Rule[];
+  }
+  return d
+    .prepare("SELECT * FROM rules ORDER BY created_at DESC")
+    .all() as Rule[];
+}
+
+export function getLogEntries(project?: string): LogEntry[] {
+  const d = getDb();
+
+  const pWhere = project ? "WHERE project_path = ?" : "";
+  const pParams = project ? [project] : [];
+
+  const patterns = d
+    .prepare(
+      `SELECT * FROM patterns ${pWhere} ORDER BY detected_at DESC LIMIT 100`
+    )
+    .all(...pParams) as Pattern[];
+
+  const rWhere = project ? "WHERE project_path = ?" : "";
+  const rParams = project ? [project] : [];
+
+  const rules = d
+    .prepare(
+      `SELECT * FROM rules ${rWhere} ORDER BY created_at DESC LIMIT 50`
+    )
+    .all(...rParams) as Rule[];
+
+  const logs: LogEntry[] = [];
+
+  for (const p of patterns) {
+    let msg = `${p.detector_type} detected`;
+    try {
+      const ev = JSON.parse(p.evidence_json);
+      msg = ev.description || ev.summary || ev.message || msg;
+    } catch {
+      /* ignore */
+    }
+
+    const levelMap: Record<string, string> = {
+      revert_cycle: "ERROR",
+      repeated_error: "ERROR",
+      silent_fix: "WARN",
+      user_correction: "INFO",
+      long_bash: "WARN",
+    };
+
+    logs.push({
+      timestamp: p.detected_at,
+      level: levelMap[p.detector_type] || "INFO",
+      component: "Detector",
+      message: `[${p.detector_type}] ${msg}`,
+    });
+  }
+
+  for (const r of rules) {
+    logs.push({
+      timestamp: r.created_at,
+      level: r.status === "dead" ? "WARN" : r.status === "active" ? "INFO" : "DEBUG",
+      component: "DB",
+      message: `Rule ${r.status}: "${r.text.slice(0, 120)}" (confidence: ${(r.confidence * 100).toFixed(0)}%)`,
+    });
+  }
+
+  logs.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  return logs;
 }

@@ -1,21 +1,42 @@
 import type { Metadata } from "next";
-import { Sidebar } from "@/components/sidebar";
+import { Suspense } from "react";
 import "./globals.css";
+import { Navbar } from "../components/navbar";
+import { TabNav } from "../components/tab-nav";
+import { getProjects } from "../lib/db";
 
 export const metadata: Metadata = {
-  title: "dejavu dashboard",
-  description: "Claude CLAUDE.md rule management dashboard",
+  title: "claude-dejavu",
+  description: "Pattern detection dashboard for Claude Code",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const dynamic = "force-dynamic";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const projects = getProjects();
+
   return (
-    <html lang="en" className="dark">
-      <body className="antialiased">
-        <Sidebar />
-        <main className="ml-[220px] min-h-screen">
-          <div className="max-w-6xl mx-auto px-8 py-8">
-            {children}
-          </div>
+    <html lang="en">
+      <body>
+        <Suspense>
+          <Navbar projects={projects} />
+          <TabNav />
+        </Suspense>
+        <main
+          style={{
+            paddingTop: "calc(var(--navbar-height) + var(--tab-height) + 24px)",
+            paddingBottom: "48px",
+            maxWidth: "720px",
+            margin: "0 auto",
+            paddingLeft: "16px",
+            paddingRight: "16px",
+          }}
+        >
+          {children}
         </main>
       </body>
     </html>
