@@ -1,7 +1,7 @@
 {
   "name": "claude-dejavu",
-  "version": "0.1.0",
-  "description": "Claude remembers its mistakes. Detects antipatterns and auto-patches CLAUDE.md.",
+  "version": "0.3.1",
+  "description": "Claude remembers its mistakes. Detects antipatterns from session logs and auto-patches CLAUDE.md.",
   "author": {
     "name": "cmg8431"
   },

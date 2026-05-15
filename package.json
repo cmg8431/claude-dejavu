@@ -2,6 +2,14 @@
   "private": true,
   "type": "module",
   "workspaces": ["packages/cli", "packages/dashboard"],
+  "files": [
+    ".agents/plugins/marketplace.json",
+    "plugin/.claude-plugin",
+    "plugin/hooks",
+    "plugin/scripts",
+    "plugin/skills",
+    "packages/cli/dist"
+  ],
   "scripts": {
     "build": "cargo build --release -p dejavu-cli && bun run build:cli",
     "build:core": "cargo build --release -p dejavu-cli",
